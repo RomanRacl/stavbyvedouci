@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Job, Member, PeriodStat } from '@/types/firestore';
-import { mockJobs, mockMembers, mockWeeklyStats } from '@/lib/mock/dashboard.mock';
-import { loadJobs, saveCreatedJob, savePatch } from '@/lib/mock/localStore';
+import { mockWeeklyStats } from '@/lib/mock/dashboard.mock';
+import { createJob, getSnapshot, patchJob } from '@/lib/mock/localBackend';
+import { subscribeStore } from '@/lib/mock/localStore';
 
 export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== '0';
 
@@ -24,7 +25,7 @@ export interface DashboardDataApi extends DashboardData {
 
 /**
  * Jediný vstupní bod dat pro dashboard. UI neví, zda data tečou z Firestore, nebo z mocku.
- * Mock režim simuluje realtime: každé 4 s přibydou na běžící zakázce hodiny a materiál.
+ * Mock režim čte data z prohlížeče a reaguje na zápisy z pohledu dělníka v reálném čase.
  */
 export function useDashboardData(companyId: string): DashboardDataApi {
   const [state, setState] = useState<DashboardData>({
@@ -37,46 +38,23 @@ export function useDashboardData(companyId: string): DashboardDataApi {
 
   useEffect(() => {
     if (USE_MOCK) {
-      const boot = setTimeout(
-        () =>
-          setState({
-            jobs: loadJobs(structuredClone(mockJobs)),
-            members: mockMembers,
-            weeklyStats: mockWeeklyStats,
-            status: 'live',
-            lastEventAt: new Date(),
-          }),
-        450, // krátké načtení, aby byly vidět skeletony
-      );
-      const tick = setInterval(() => {
+      // Data z prohlížeče; změny z pohledu dělníka (i v jiné záložce) přijdou přes subscribeStore.
+      const pull = () => {
+        const snap = getSnapshot();
         setState((s) => ({
           ...s,
+          jobs: snap.jobs,
+          members: snap.members,
+          weeklyStats: mockWeeklyStats,
+          status: 'live',
           lastEventAt: new Date(),
-          jobs: s.jobs.map((j) => {
-            if (j.status !== 'in_progress') return j;
-            const hours = 0.25 * j.assignedWorkerIds.length;
-            const line = j.materialPlan[0];
-            const qty = line && Math.random() < 0.5 ? 2 : 0;
-            return {
-              ...j,
-              actuals: {
-                laborHours: +(j.actuals.laborHours + hours).toFixed(2),
-                laborCost: j.actuals.laborCost + Math.round(hours * 370),
-                materialCost: j.actuals.materialCost + (line ? qty * line.unitCost : 0),
-                updatedAt: new Date(),
-              },
-              materialPlan: j.materialPlan.map((m, i) => (i === 0 ? { ...m, usedQty: m.usedQty + qty } : m)),
-              updatedAt: new Date(),
-            };
-          }),
-          weeklyStats: s.weeklyStats.map((w, i, arr) =>
-            i === arr.length - 1 ? { ...w, revenue: w.revenue + 1200, laborCost: w.laborCost + 370, hours: w.hours + 1 } : w,
-          ),
         }));
-      }, 4000);
+      };
+      const boot = setTimeout(pull, 450); // krátké načtení, aby byly vidět skeletony
+      const unsub = subscribeStore(pull);
       return () => {
         clearTimeout(boot);
-        clearInterval(tick);
+        unsub();
       };
     }
 
@@ -105,19 +83,9 @@ export function useDashboardData(companyId: string): DashboardDataApi {
     };
   }, [companyId]);
 
-  const mockWrite = useCallback((jobId: string, patch: Partial<Job>) => {
-    savePatch(jobId, patch);
-    setState((s) => ({
-      ...s,
-      lastEventAt: new Date(),
-      jobs: s.jobs.map((j) => (j.id === jobId ? { ...j, ...patch, updatedAt: new Date() } : j)),
-    }));
-  }, []);
-
-  const mockCreate = useCallback((job: Job) => {
-    saveCreatedJob(job);
-    setState((s) => ({ ...s, lastEventAt: new Date(), jobs: [job, ...s.jobs] }));
-  }, []);
+  // Zápis vyvolá událost úložiště -> pull() výše načte nový stav.
+  const mockWrite = useCallback((jobId: string, patch: Partial<Job>) => patchJob(jobId, patch), []);
+  const mockCreate = useCallback((job: Job) => createJob(job), []);
 
   return { ...state, mockWrite, mockCreate };
 }

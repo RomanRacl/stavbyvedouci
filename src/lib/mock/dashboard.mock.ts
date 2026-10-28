@@ -3,14 +3,16 @@ import type { Job, Member, MaterialUsage, PeriodStat } from '@/types/firestore';
 /** Mock data 1:1 podle schématu Firestore (po konvertoru Timestamp -> Date). */
 
 const d = (iso: string) => new Date(iso);
+/** Ukázkové časovače běží „od rána“ relativně k okamžiku načtení, ne k pevnému datu. */
+const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000);
 
 export const MOCK_COMPANY_ID = 'cmp_novak_stavby';
 
 export const mockMembers: Member[] = [
   { uid: 'u_owner', displayName: 'Petr Novák', initials: 'PN', role: 'owner', phone: '+420 602 111 222', hourlyCost: 0, active: true, activeTimer: null },
-  { uid: 'u_dvorak', displayName: 'Jan Dvořák', initials: 'JD', role: 'worker', phone: '+420 603 445 120', hourlyCost: 380, active: true, activeTimer: { logId: 'tl_901', jobId: 'job_0142', startedAt: d('2026-10-28T07:05:00') } },
-  { uid: 'u_kral', displayName: 'Martin Král', initials: 'MK', role: 'worker', phone: '+420 731 202 334', hourlyCost: 360, active: true, activeTimer: { logId: 'tl_902', jobId: 'job_0142', startedAt: d('2026-10-28T07:12:00') } },
-  { uid: 'u_hajek', displayName: 'Tomáš Hájek', initials: 'TH', role: 'worker', phone: '+420 724 889 010', hourlyCost: 420, active: true, activeTimer: { logId: 'tl_903', jobId: 'job_0145', startedAt: d('2026-10-28T06:50:00') } },
+  { uid: 'u_dvorak', displayName: 'Jan Dvořák', initials: 'JD', role: 'worker', phone: '+420 603 445 120', hourlyCost: 380, active: true, activeTimer: { logId: 'tl_901', jobId: 'job_0142', startedAt: minutesAgo(95) } },
+  { uid: 'u_kral', displayName: 'Martin Král', initials: 'MK', role: 'worker', phone: '+420 731 202 334', hourlyCost: 360, active: true, activeTimer: { logId: 'tl_902', jobId: 'job_0142', startedAt: minutesAgo(88) } },
+  { uid: 'u_hajek', displayName: 'Tomáš Hájek', initials: 'TH', role: 'worker', phone: '+420 724 889 010', hourlyCost: 420, active: true, activeTimer: { logId: 'tl_903', jobId: 'job_0145', startedAt: minutesAgo(130) } },
   { uid: 'u_benes', displayName: 'Lukáš Beneš', initials: 'LB', role: 'worker', phone: '+420 608 300 765', hourlyCost: 340, active: true, activeTimer: null },
   { uid: 'u_svoboda', displayName: 'Ondřej Svoboda', initials: 'OS', role: 'manager', phone: '+420 777 610 482', hourlyCost: 450, active: true, activeTimer: null },
 ];

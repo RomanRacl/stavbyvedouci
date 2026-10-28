@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
-import { AlertCircle, CheckCircle2, ClipboardList, Plus, WifiOff } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ClipboardList, Plus, Smartphone, WifiOff } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { companyKpis } from '@/features/analytics/lib/metrics';
@@ -222,6 +222,14 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
               })}
             </div>
           </LayoutGroup>
+          <a
+            href="/w"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink-2 transition hover:text-ink focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:outline-none"
+          >
+            <Smartphone className="size-4" /> Pohled dělníka
+          </a>
           <button
             type="button"
             onClick={() => setNewJobOpen(true)}

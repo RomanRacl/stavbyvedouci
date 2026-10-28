@@ -6,7 +6,8 @@ import { Accordion, AccordionItem } from '@/components/ui/Accordion';
 import { Drawer } from '@/components/ui/Drawer';
 import { fmt, forecastMaterial } from '@/features/analytics/lib/metrics';
 import { USE_MOCK } from '@/features/jobs/hooks/useDashboardData';
-import { mockMaterialUsage } from '@/lib/mock/dashboard.mock';
+import { getSnapshot } from '@/lib/mock/localBackend';
+import { subscribeStore } from '@/lib/mock/localStore';
 import type { Job, Member, MaterialUsage } from '@/types/firestore';
 import { RiskBadge } from './JobDetail';
 
@@ -17,8 +18,13 @@ function useMaterialUsage(companyId: string, jobId: string | null) {
     if (!jobId) return;
     setRows(null);
     if (USE_MOCK) {
-      const t = setTimeout(() => setRows(mockMaterialUsage.filter((u) => u.jobId === jobId)), 250);
-      return () => clearTimeout(t);
+      const pull = () => setRows(getSnapshot().usage.filter((u) => u.jobId === jobId));
+      const t = setTimeout(pull, 250);
+      const unsub = subscribeStore(pull);
+      return () => {
+        clearTimeout(t);
+        unsub();
+      };
     }
     let unsub: (() => void) | undefined;
     let cancelled = false;
