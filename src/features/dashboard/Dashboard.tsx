@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
-import { AlertCircle, ClipboardList, WifiOff } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ClipboardList, Plus, WifiOff } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { companyKpis } from '@/features/analytics/lib/metrics';
@@ -12,6 +12,7 @@ import { JobDetail } from './components/JobDetail';
 import { JobList } from './components/JobList';
 import { KpiStrip } from './components/KpiStrip';
 import { MaterialDrawer } from './components/MaterialDrawer';
+import { NewJobDrawer } from './components/NewJobDrawer';
 import { RevenueCostChart } from './components/RevenueCostChart';
 
 interface DashboardProps {
@@ -52,7 +53,9 @@ function LiveBadge({ status, at }: { status: string; at: Date | null }) {
   );
 }
 
-function Toast({ message, onDone }: { message: string | null; onDone: () => void }) {
+type ToastMsg = { text: string; tone: 'error' | 'success' };
+
+function Toast({ message, onDone }: { message: ToastMsg | null; onDone: () => void }) {
   useEffect(() => {
     if (!message) return;
     const t = setTimeout(onDone, 4000);
@@ -68,7 +71,12 @@ function Toast({ message, onDone }: { message: string | null; onDone: () => void
             exit={{ opacity: 0, y: 8 }}
             className="pointer-events-auto flex items-center gap-2 rounded-lg bg-ink px-4 py-3 text-sm text-white shadow-xl"
           >
-            <AlertCircle className="size-4 text-safety" /> {message}
+            {message.tone === 'error' ? (
+              <AlertCircle className="size-4 text-safety" />
+            ) : (
+              <CheckCircle2 className="size-4 text-good" />
+            )}
+            {message.text}
           </motion.div>
         )}
       </AnimatePresence>
@@ -105,9 +113,11 @@ function EmptyDetail() {
 
 export default function Dashboard({ companyId, companyName, currentUid }: DashboardProps) {
   const data = useDashboardData(companyId);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastMsg | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
-  const { jobs, mutate, isPending } = useOptimisticJobs(data.jobs, setToast);
+  const showError = useCallback((text: string) => setToast({ text, tone: 'error' }), []);
+  const { jobs, mutate, isPending } = useOptimisticJobs(data.jobs, showError);
+  const [newJobOpen, setNewJobOpen] = useState(false);
 
   const [weeks, setWeeks] = useState<number>(12);
   const [materialsOpen, setMaterialsOpen] = useState(false);
@@ -155,14 +165,29 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
     [mutate, currentUid, companyId, data],
   );
 
+  /* Založení zakázky: v mock režimu se uloží do prohlížeče, panel se zavře a nová zakázka se rovnou otevře. */
+  const createJob = useCallback(
+    (job: Job) => {
+      if (!USE_MOCK) {
+        showError('Zakládání do Firebase zatím není zapojené. Nastavte NEXT_PUBLIC_USE_MOCK=1.');
+        return;
+      }
+      data.mockCreate(job);
+      setNewJobOpen(false);
+      select(job.id);
+      setToast({ text: `Zakázka ${job.code} je založená.`, tone: 'success' });
+    },
+    [data, select, showError],
+  );
+
   // Klávesnice: Esc zavře detail (když není otevřený Drawer – ten má vlastní Esc).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && selectedId && !materialsOpen) select(null);
+      if (e.key === 'Escape' && selectedId && !materialsOpen && !newJobOpen) select(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selectedId, materialsOpen, select]);
+  }, [selectedId, materialsOpen, newJobOpen, select]);
 
   return (
     <div className="min-h-dvh bg-concrete">
@@ -197,6 +222,14 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
               })}
             </div>
           </LayoutGroup>
+          <button
+            type="button"
+            onClick={() => setNewJobOpen(true)}
+            disabled={data.status === 'loading'}
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-ink px-4 text-sm font-semibold text-white transition hover:bg-ink/90 focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-[0.97] disabled:opacity-50"
+          >
+            <Plus className="size-4" /> Nová zakázka
+          </button>
         </header>
 
         {data.status === 'loading' ? (
@@ -246,6 +279,13 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
         members={data.members}
         open={materialsOpen && Boolean(selected)}
         onClose={() => setMaterialsOpen(false)}
+      />
+      <NewJobDrawer
+        open={newJobOpen}
+        onClose={() => setNewJobOpen(false)}
+        members={data.members}
+        existingJobs={jobs}
+        onCreate={createJob}
       />
       <Toast message={toast} onDone={clearToast} />
     </div>

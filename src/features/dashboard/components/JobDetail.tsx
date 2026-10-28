@@ -219,6 +219,11 @@ export function JobDetail({ job, members, approving, onApprove, onOpenMaterials,
           <h3 id={`crew-${job.id}`} className="mb-2 text-sm font-semibold text-ink">
             Parta na zakázce
           </h3>
+          {crew.length === 0 && (
+            <p className="rounded-lg border border-dashed border-line px-4 py-3 text-sm text-ink-2">
+              Na zakázku zatím není nikdo přiřazený.
+            </p>
+          )}
           <ul className="grid gap-2 sm:grid-cols-2">
             {crew.map((m) => {
               const running = m.activeTimer?.jobId === job.id ? m.activeTimer : null;
@@ -269,6 +274,11 @@ export function JobDetail({ job, members, approving, onApprove, onOpenMaterials,
               <Package className="size-4" /> Výdeje materiálu
             </button>
           </div>
+          {materials.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-line px-4 py-3 text-sm text-ink-2">
+              Materiál zatím není naplánovaný. Výdeje se objeví, jakmile je parta zapíše v mobilu.
+            </p>
+          ) : (
           <Accordion>
             {materials.map((m) => {
               const usedPct = Math.min(100, (m.usedQty / Math.max(m.projectedQty, m.plannedQty)) * 100);
@@ -316,6 +326,7 @@ export function JobDetail({ job, members, approving, onApprove, onOpenMaterials,
               );
             })}
           </Accordion>
+          )}
         </section>
       </div>
     </motion.article>

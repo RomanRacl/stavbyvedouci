@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Job, Member, PeriodStat } from '@/types/firestore';
 import { mockJobs, mockMembers, mockWeeklyStats } from '@/lib/mock/dashboard.mock';
+import { loadJobs, saveCreatedJob, savePatch } from '@/lib/mock/localStore';
 
 export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== '0';
 
@@ -17,6 +18,8 @@ export interface DashboardData {
 export interface DashboardDataApi extends DashboardData {
   /** Jen pro mock režim: simuluje zápis „na server“, který se vrátí jako snapshot. */
   mockWrite: (jobId: string, patch: Partial<Job>) => void;
+  /** Jen pro mock režim: založení zakázky, uloží se do prohlížeče. */
+  mockCreate: (job: Job) => void;
 }
 
 /**
@@ -37,7 +40,7 @@ export function useDashboardData(companyId: string): DashboardDataApi {
       const boot = setTimeout(
         () =>
           setState({
-            jobs: structuredClone(mockJobs),
+            jobs: loadJobs(structuredClone(mockJobs)),
             members: mockMembers,
             weeklyStats: mockWeeklyStats,
             status: 'live',
@@ -53,13 +56,13 @@ export function useDashboardData(companyId: string): DashboardDataApi {
             if (j.status !== 'in_progress') return j;
             const hours = 0.25 * j.assignedWorkerIds.length;
             const line = j.materialPlan[0];
-            const qty = Math.random() < 0.5 ? 2 : 0;
+            const qty = line && Math.random() < 0.5 ? 2 : 0;
             return {
               ...j,
               actuals: {
                 laborHours: +(j.actuals.laborHours + hours).toFixed(2),
                 laborCost: j.actuals.laborCost + Math.round(hours * 370),
-                materialCost: j.actuals.materialCost + qty * line.unitCost,
+                materialCost: j.actuals.materialCost + (line ? qty * line.unitCost : 0),
                 updatedAt: new Date(),
               },
               materialPlan: j.materialPlan.map((m, i) => (i === 0 ? { ...m, usedQty: m.usedQty + qty } : m)),
@@ -103,6 +106,7 @@ export function useDashboardData(companyId: string): DashboardDataApi {
   }, [companyId]);
 
   const mockWrite = useCallback((jobId: string, patch: Partial<Job>) => {
+    savePatch(jobId, patch);
     setState((s) => ({
       ...s,
       lastEventAt: new Date(),
@@ -110,5 +114,10 @@ export function useDashboardData(companyId: string): DashboardDataApi {
     }));
   }, []);
 
-  return { ...state, mockWrite };
+  const mockCreate = useCallback((job: Job) => {
+    saveCreatedJob(job);
+    setState((s) => ({ ...s, lastEventAt: new Date(), jobs: [job, ...s.jobs] }));
+  }, []);
+
+  return { ...state, mockWrite, mockCreate };
 }
