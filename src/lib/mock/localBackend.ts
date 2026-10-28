@@ -1,5 +1,5 @@
-import type { Job, Member, MaterialUsage } from '@/types/firestore';
-import { mockJobs, mockMaterialUsage, mockMembers } from './dashboard.mock';
+import type { Job, MaterialItem, MaterialPlanLine, Member, MaterialUsage } from '@/types/firestore';
+import { mockJobs, mockMaterials, mockMaterialUsage, mockMembers } from './dashboard.mock';
 import { readStore, updateStore, type Stored } from './localStore';
 
 /**
@@ -12,12 +12,13 @@ export interface Snapshot {
   jobs: Job[];
   members: Member[];
   usage: MaterialUsage[];
+  catalog: MaterialItem[];
 }
 
 function build(s: Stored): Snapshot {
   const jobs = [...s.created, ...mockJobs].map((j) => (s.patches[j.id] ? { ...j, ...s.patches[j.id] } : j));
   const members = mockMembers.map((m) => (m.uid in s.timers ? { ...m, activeTimer: s.timers[m.uid] } : m));
-  return { jobs, members, usage: [...s.usage, ...mockMaterialUsage] };
+  return { jobs, members, usage: [...s.usage, ...mockMaterialUsage], catalog: mockMaterials };
 }
 
 export const getSnapshot = (): Snapshot => build(readStore());
@@ -90,15 +91,25 @@ export function stopWork(uid: string): { minutes: number; job: Job | null } {
   return result;
 }
 
-/** Výdej materiálu: záznam do logu + navýšení čerpání a nákladů na zakázce. */
-export function issueMaterial(uid: string, jobId: string, items: Array<{ materialId: string; qty: number }>) {
+/** Položka výdeje. U materiálu mimo plán se posílá i `line`, aby se dal do plánu doplnit. */
+export interface IssueItem {
+  materialId: string;
+  qty: number;
+  line?: Omit<MaterialPlanLine, 'plannedQty' | 'usedQty'>;
+}
+
+/** Výdej materiálu: záznam do logu + navýšení čerpání a nákladů na zakázce. Neplánovaný materiál se přidá s plánem 0. */
+export function issueMaterial(uid: string, jobId: string, items: IssueItem[]) {
   updateStore((s) => {
     const job = build(s).jobs.find((j) => j.id === jobId);
     if (!job) return s;
     const now = new Date();
+    const extras: MaterialPlanLine[] = items
+      .filter((i) => i.line && !job.materialPlan.some((l) => l.materialId === i.materialId))
+      .map((i) => ({ ...i.line!, plannedQty: 0, usedQty: 0 }));
     const entries: MaterialUsage[] = [];
     let addedCost = 0;
-    const plan = job.materialPlan.map((line) => {
+    const plan = [...job.materialPlan, ...extras].map((line) => {
       const item = items.find((i) => i.materialId === line.materialId);
       if (!item || item.qty <= 0) return line;
       addedCost += item.qty * line.unitCost;
@@ -119,6 +130,19 @@ export function issueMaterial(uid: string, jobId: string, items: Array<{ materia
       actuals: { ...job.actuals, materialCost: job.actuals.materialCost + addedCost, updatedAt: now },
     });
     return { ...next, usage: [...entries, ...next.usage] };
+  });
+}
+
+/**
+ * Plán materiálu z kanceláře. Rozpočet materiálu se přepočte ze součtu plánu,
+ * aby prognóza a marže v dashboardu odpovídaly tomu, co se skutečně plánuje.
+ */
+export function setMaterialPlan(jobId: string, plan: MaterialPlanLine[]) {
+  updateStore((s) => {
+    const job = build(s).jobs.find((j) => j.id === jobId);
+    if (!job) return s;
+    const materialCost = plan.reduce((a, l) => a + l.plannedQty * l.unitCost, 0);
+    return patchIn(s, jobId, { materialPlan: plan, budget: { ...job.budget, materialCost } });
   });
 }
 

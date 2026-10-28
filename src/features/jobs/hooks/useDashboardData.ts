@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { Job, Member, PeriodStat } from '@/types/firestore';
+import type { Job, MaterialItem, Member, PeriodStat } from '@/types/firestore';
 import { mockWeeklyStats } from '@/lib/mock/dashboard.mock';
 import { createJob, getSnapshot, patchJob } from '@/lib/mock/localBackend';
 import { subscribeStore } from '@/lib/mock/localStore';
@@ -12,6 +12,8 @@ export interface DashboardData {
   jobs: Job[];
   members: Member[];
   weeklyStats: PeriodStat[];
+  /** Katalog materiálu firmy (companies/{cid}/materials). */
+  catalog: MaterialItem[];
   status: 'loading' | 'live' | 'offline' | 'error';
   lastEventAt: Date | null;
 }
@@ -32,6 +34,7 @@ export function useDashboardData(companyId: string): DashboardDataApi {
     jobs: [],
     members: [],
     weeklyStats: [],
+    catalog: [],
     status: 'loading',
     lastEventAt: null,
   });
@@ -46,6 +49,7 @@ export function useDashboardData(companyId: string): DashboardDataApi {
           jobs: snap.jobs,
           members: snap.members,
           weeklyStats: mockWeeklyStats,
+          catalog: snap.catalog,
           status: 'live',
           lastEventAt: new Date(),
         }));

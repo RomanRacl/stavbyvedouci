@@ -221,6 +221,7 @@ export default function WorkerApp() {
       {openJob && (
         <MaterialSheet
           job={openJob}
+          catalog={snap.catalog}
           open={materialOpen}
           onClose={() => setMaterialOpen(false)}
           onSubmit={(items) => {

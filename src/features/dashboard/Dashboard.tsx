@@ -7,11 +7,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { companyKpis } from '@/features/analytics/lib/metrics';
 import { USE_MOCK, useDashboardData } from '@/features/jobs/hooks/useDashboardData';
 import { useOptimisticJobs } from '@/features/jobs/hooks/useOptimisticJobs';
+import { setMaterialPlan } from '@/lib/mock/localBackend';
 import type { Job } from '@/types/firestore';
 import { JobDetail } from './components/JobDetail';
 import { JobList } from './components/JobList';
 import { KpiStrip } from './components/KpiStrip';
 import { MaterialDrawer } from './components/MaterialDrawer';
+import { MaterialPlanDrawer } from './components/MaterialPlanDrawer';
 import { NewJobDrawer } from './components/NewJobDrawer';
 import { RevenueCostChart } from './components/RevenueCostChart';
 
@@ -118,6 +120,7 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
   const showError = useCallback((text: string) => setToast({ text, tone: 'error' }), []);
   const { jobs, mutate, isPending } = useOptimisticJobs(data.jobs, showError);
   const [newJobOpen, setNewJobOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
 
   const [weeks, setWeeks] = useState<number>(12);
   const [materialsOpen, setMaterialsOpen] = useState(false);
@@ -183,11 +186,11 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
   // Klávesnice: Esc zavře detail (když není otevřený Drawer – ten má vlastní Esc).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && selectedId && !materialsOpen && !newJobOpen) select(null);
+      if (e.key === 'Escape' && selectedId && !materialsOpen && !newJobOpen && !planOpen) select(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selectedId, materialsOpen, newJobOpen, select]);
+  }, [selectedId, materialsOpen, newJobOpen, planOpen, select]);
 
   return (
     <div className="min-h-dvh bg-concrete">
@@ -267,6 +270,7 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
                       approving={isPending(selected.id)}
                       onApprove={() => approve(selected)}
                       onOpenMaterials={() => setMaterialsOpen(true)}
+                      onPlanMaterials={() => setPlanOpen(true)}
                       onBack={() => select(null)}
                     />
                   ) : (
@@ -287,6 +291,22 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
         members={data.members}
         open={materialsOpen && Boolean(selected)}
         onClose={() => setMaterialsOpen(false)}
+      />
+      <MaterialPlanDrawer
+        job={selected}
+        catalog={data.catalog}
+        open={planOpen && Boolean(selected)}
+        onClose={() => setPlanOpen(false)}
+        onSave={(plan) => {
+          if (!selected) return;
+          if (!USE_MOCK) {
+            showError('Ukládání plánu do Firebase zatím není zapojené.');
+            return;
+          }
+          setMaterialPlan(selected.id, plan);
+          setPlanOpen(false);
+          setToast({ text: `Plán materiálu pro ${selected.code} je uložený.`, tone: 'success' });
+        }}
       />
       <NewJobDrawer
         open={newJobOpen}

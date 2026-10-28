@@ -64,7 +64,8 @@ export function forecastMaterial(line: MaterialPlanLine, progressPct: number): M
     overrunQty,
     overrunCost: overrunQty * line.unitCost,
     remainingToBuy: Math.max(0, projectedQty - line.usedQty),
-    risk: ratio > 1.08 ? 'overrun' : ratio > 1.0 ? 'watch' : 'ok',
+    // Materiál mimo plán (plán 0) je vždy překročení.
+    risk: line.plannedQty === 0 && projectedQty > 0 ? 'overrun' : ratio > 1.08 ? 'overrun' : ratio > 1.0 ? 'watch' : 'ok',
   };
 }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlertTriangle, ArrowLeft, Check, Loader2, MapPin, Package, Phone } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, ListPlus, Loader2, MapPin, Package, Phone } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Accordion, AccordionItem } from '@/components/ui/Accordion';
@@ -17,6 +17,7 @@ interface Props {
   approving: boolean;
   onApprove: () => void;
   onOpenMaterials: () => void;
+  onPlanMaterials: () => void;
   onBack: () => void;
 }
 
@@ -66,7 +67,7 @@ function Metric({ label, value, help, tone }: { label: string; value: string; he
   );
 }
 
-export function JobDetail({ job, members, approving, onApprove, onOpenMaterials, onBack }: Props) {
+export function JobDetail({ job, members, approving, onApprove, onOpenMaterials, onPlanMaterials, onBack }: Props) {
   const f = jobFinancials(job);
   const now = useNow();
   const crew = members.filter((m) => job.assignedWorkerIds.includes(m.uid));
@@ -273,10 +274,20 @@ export function JobDetail({ job, members, approving, onApprove, onOpenMaterials,
             >
               <Package className="size-4" /> Výdeje materiálu
             </button>
+            <button
+              type="button"
+              onClick={onPlanMaterials}
+              className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-sm font-medium text-ink transition hover:border-ink-3 focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:outline-none"
+            >
+              <ListPlus className="size-4" /> Naplánovat
+            </button>
           </div>
           {materials.length === 0 ? (
             <p className="rounded-lg border border-dashed border-line px-4 py-3 text-sm text-ink-2">
-              Materiál zatím není naplánovaný. Výdeje se objeví, jakmile je parta zapíše v mobilu.
+              Materiál zatím není naplánovaný.{' '}
+              <button type="button" onClick={onPlanMaterials} className="font-medium text-series-1-ink underline underline-offset-4">
+                Naplánovat materiál
+              </button>
             </p>
           ) : (
           <Accordion>

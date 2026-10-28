@@ -151,7 +151,9 @@ export function WorkerJobView({ job, myTimer, onBack, onStart, onStop, onProgres
                       <li key={l.materialId} className="flex items-center gap-3 px-4 py-3">
                         <span className="min-w-0 flex-1 text-base text-ink">{l.name}</span>
                         <span className={`text-base tabular-nums ${over ? 'font-semibold text-crit-ink' : 'text-ink-2'}`}>
-                          {fmt.num(l.usedQty)} / {fmt.num(l.plannedQty)} {l.unit}
+                          {l.plannedQty === 0
+                            ? `${fmt.num(l.usedQty)} ${l.unit}, mimo plán`
+                            : `${fmt.num(l.usedQty)} / ${fmt.num(l.plannedQty)} ${l.unit}`}
                         </span>
                       </li>
                     );

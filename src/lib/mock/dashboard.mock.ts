@@ -1,4 +1,4 @@
-import type { Job, Member, MaterialUsage, PeriodStat } from '@/types/firestore';
+import type { Job, MaterialItem, Member, MaterialUsage, PeriodStat } from '@/types/firestore';
 
 /** Mock data 1:1 podle schématu Firestore (po konvertoru Timestamp -> Date). */
 
@@ -110,6 +110,39 @@ export const mockJobs: Job[] = [
     approval: { approvedBy: 'u_owner', approvedAt: d('2026-10-13T08:30:00') },
     createdAt: d('2026-09-25'), updatedAt: d('2026-10-13T08:30:00'),
   },
+];
+
+
+/** Katalog materiálu firmy (companies/{cid}/materials). Z něj se plánuje i vydává. */
+const m = (id: string, sku: string, name: string, category: string, unit: MaterialItem['unit'], unitCost: number, stockQty: number, supplier: string): MaterialItem => ({
+  id, sku, name, category, unit, unitCost, stockQty, reorderPoint: Math.round(stockQty * 0.25), supplier,
+});
+
+export const mockMaterials: MaterialItem[] = [
+  m('mat_cyky3x25', 'CYKY-3x2.5', 'Kabel CYKY-J 3×2,5', 'Elektro', 'm', 32, 850, 'Elfetex'),
+  m('mat_cyky3x15', 'CYKY-3x1.5', 'Kabel CYKY-J 3×1,5', 'Elektro', 'm', 22, 1200, 'Elfetex'),
+  m('mat_cyky5x25', 'CYKY-5x2.5', 'Kabel CYKY-J 5×2,5', 'Elektro', 'm', 54, 300, 'Elfetex'),
+  m('mat_krabkp68', 'KP68', 'Krabice KP 68', 'Elektro', 'ks', 14, 400, 'Elfetex'),
+  m('mat_jistic16b', 'B16-1P', 'Jistič 1P B16', 'Elektro', 'ks', 165, 60, 'Elfetex'),
+  m('mat_jistic3f', 'C32-3P', 'Jistič 3P C32', 'Elektro', 'ks', 890, 12, 'Elfetex'),
+  m('mat_chranic', 'OFI-40-4', 'Proudový chránič 40A/30mA 4P', 'Elektro', 'ks', 1290, 10, 'Elfetex'),
+  m('mat_rozv36', 'RZ-36', 'Rozvodnice 36 mod.', 'Elektro', 'ks', 2890, 4, 'Elfetex'),
+  m('mat_rozv54', 'RZ-54-IP65', 'Rozvaděč 54 mod. IP65', 'Elektro', 'ks', 6900, 2, 'Elfetex'),
+  m('mat_zasuvka', 'ZAS-2P', 'Zásuvka dvojnásobná bílá', 'Elektro', 'ks', 129, 150, 'Elfetex'),
+  m('mat_ppr32', 'PPR-32-20', 'Trubka PPR 32 PN20', 'Voda a topení', 'm', 118, 500, 'Ptáček'),
+  m('mat_ppr25', 'PPR-25-20', 'Trubka PPR 25 PN20', 'Voda a topení', 'm', 74, 600, 'Ptáček'),
+  m('mat_izol32', 'TUB-32-13', 'Izolace Tubolit 32/13', 'Voda a topení', 'm', 41, 400, 'Ptáček'),
+  m('mat_ventil', 'KV-54', 'Kulový ventil 5/4"', 'Voda a topení', 'ks', 486, 40, 'Ptáček'),
+  m('mat_koleno32', 'PPR-K32', 'Koleno PPR 32/90°', 'Voda a topení', 'ks', 19, 300, 'Ptáček'),
+  m('mat_okno1215', 'OK-120150-3', 'Okno plast. 120×150, trojsklo', 'Okna', 'ks', 11800, 0, 'Oknoplast'),
+  m('mat_pena', 'PU-750', 'PU pěna nízkoexp. 750 ml', 'Okna', 'ks', 189, 80, 'Oknoplast'),
+  m('mat_paska', 'OP-VN', 'Okenní páska vnitřní', 'Okna', 'm', 26, 300, 'Oknoplast'),
+  m('mat_obklad', 'OBK-3060', 'Obklad 30×60 rektif.', 'Stavba', 'm', 690, 60, 'Siko'),
+  m('mat_lepidlo', 'C2TE-25', 'Flex. lepidlo C2TE', 'Stavba', 'bal', 345, 40, 'Siko'),
+  m('mat_hydro', 'HS-5', 'Hydroizolační stěrka', 'Stavba', 'kg', 118, 50, 'Siko'),
+  m('mat_sadrokarton', 'SDK-125', 'Sádrokarton 12,5 mm', 'Stavba', 'ks', 189, 120, 'Siko'),
+  m('mat_tc9kw', 'TC-9', 'TČ split 9 kW', 'TČ', 'ks', 158000, 1, 'Daikin'),
+  m('mat_cu', 'CU-38-58', 'Cu potrubí 3/8" + 5/8"', 'TČ', 'm', 410, 40, 'Daikin'),
 ];
 
 /** Log čerpání materiálu – zobrazuje se v Draweru (Accordion po položkách). */

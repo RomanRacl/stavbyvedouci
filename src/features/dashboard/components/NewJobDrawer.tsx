@@ -261,7 +261,7 @@ export function NewJobDrawer({ open, onClose, members, existingJobs, onCreate }:
             <Field label="Hodiny práce" error={errors.laborHours} hint={`náklad ${fmt.czk(laborCost)} při ${fmt.czk(hourlyCost)}/h`}>
               <input inputMode="decimal" value={form.laborHours} onChange={(e) => set('laborHours', e.target.value.replace(',', '.'))} className={`${inputCls} ${border(errors.laborHours)} tabular-nums`} />
             </Field>
-            <Field label="Materiál (Kč)" error={errors.materialCost}>
+            <Field label="Materiál (Kč)" error={errors.materialCost} hint="odhad, rozepíšete po založení">
               <input inputMode="numeric" value={form.materialCost} onChange={(e) => set('materialCost', e.target.value.replace(/\s/g, ''))} className={`${inputCls} ${border(errors.materialCost)} tabular-nums`} />
             </Field>
           </div>
