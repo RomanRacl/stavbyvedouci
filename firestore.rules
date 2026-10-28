@@ -1,0 +1,67 @@
+rules_version = '2';
+// Tenant izolace přes custom claims: token.companyId + token.role (nastavuje Cloud Function při pozvání).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn()        { return request.auth != null; }
+    function inCompany(cid)    { return signedIn() && request.auth.token.companyId == cid; }
+    function role()            { return request.auth.token.role; }
+    function isOffice(cid)     { return inCompany(cid) && role() in ['owner', 'manager']; }
+    function changed()         { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false; // jen Admin SDK
+    }
+
+    match /companies/{cid} {
+      allow read: if inCompany(cid);
+      allow update: if inCompany(cid) && role() == 'owner';
+
+      match /members/{uid} {
+        allow read: if inCompany(cid);
+        // Dělník smí měnit jen vlastní activeTimer; vše ostatní kancelář.
+        allow update: if isOffice(cid)
+          || (inCompany(cid) && request.auth.uid == uid && changed().hasOnly(['activeTimer']));
+      }
+
+      match /jobs/{jobId} {
+        // Dělník vidí jen zakázky, na které je přiřazen.
+        allow read: if isOffice(cid)
+          || (inCompany(cid) && request.auth.uid in resource.data.assignedWorkerIds);
+        allow create, delete: if isOffice(cid);
+        allow update: if isOffice(cid)
+          // dělník hlásí jen dokončenost a přechod do „ke schválení“
+          || (inCompany(cid) && request.auth.uid in resource.data.assignedWorkerIds
+              && changed().hasOnly(['progressPct', 'status', 'updatedAt'])
+              && request.resource.data.status in [resource.data.status, 'awaiting_approval']);
+      }
+
+      // Append-only logy z terénu: vlastní záznamy, bez mazání; náklady dopočítá server.
+      match /timeLogs/{logId} {
+        allow read: if isOffice(cid) || (inCompany(cid) && resource.data.workerId == request.auth.uid);
+        allow create: if inCompany(cid) && request.resource.data.workerId == request.auth.uid
+          && request.resource.data.costSnapshot == null;
+        allow update: if inCompany(cid) && resource.data.workerId == request.auth.uid
+          && resource.data.endedAt == null && changed().hasOnly(['endedAt']);
+        allow delete: if false;
+      }
+
+      match /materialUsage/{id} {
+        allow read: if inCompany(cid);
+        allow create: if inCompany(cid) && request.resource.data.workerId == request.auth.uid;
+        allow update, delete: if isOffice(cid);
+      }
+
+      match /materials/{materialId} {
+        allow read: if inCompany(cid);
+        allow write: if isOffice(cid);
+      }
+
+      match /stats/{periodId} {
+        allow read: if isOffice(cid);
+        allow write: if false; // jen Cloud Functions
+      }
+    }
+  }
+}

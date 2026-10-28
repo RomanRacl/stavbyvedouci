@@ -1,0 +1,60 @@
+@import 'tailwindcss';
+
+/*
+ * Tokeny „Beton a výstražná páska“: chladná betonová šeď, tmavý inkoust,
+ * signální žlutá jen na jednom místě (aktivní zakázka). Stavové barvy jsou
+ * vyhrazené stavům; *-ink varianty drží kontrast textu ≥ 4.5:1.
+ */
+@theme {
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+
+  --color-concrete: #eef0f2;
+  --color-surface: #ffffff;
+  --color-line: #dde1e5;
+  --color-ink: #16202a;
+  --color-ink-2: #4a5561;
+  --color-ink-3: #7b8591;
+  --color-safety: #f2b705;
+
+  --color-series-1: #2a78d6;
+  --color-series-1-ink: #1f5fae;
+  --color-series-2: #eb6834;
+
+  --color-good: #1f8a4c;
+  --color-good-ink: #17703d;
+  --color-warn: #c98500;
+  --color-warn-ink: #8a5a00;
+  --color-crit: #c8372d;
+  --color-crit-ink: #a92b22;
+}
+
+/* Užší řez Archiva pro čísla, kódy zakázek a nadpisy – „technický výkres“. */
+@utility font-display {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  font-stretch: 84%;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Výstražná páska: jediný dekorativní prvek – označuje vybranou zakázku. */
+@utility hazard {
+  background: repeating-linear-gradient(-45deg, var(--color-safety) 0 4px, var(--color-ink) 4px 8px);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--color-concrete);
+    color: var(--color-ink);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
