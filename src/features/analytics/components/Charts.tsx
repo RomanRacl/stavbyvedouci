@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Bar,
   BarChart,
@@ -23,9 +23,16 @@ import { ChartCard, ChartTip, LegendDot } from './ChartCard';
 const WARN = chart.warn; // stavová barva „pozor“ – jen pro přetížené týdny
 const axis = { tickLine: false, tick: { fill: chart.axis, fontSize: chart.font } } as const;
 
-interface TipProps<T> {
+/** Vstup vlastního tooltipu – volně typovaný, aby seděl na TooltipProps z Recharts. */
+interface TipIn {
   active?: boolean;
-  payload?: Array<{ payload: T }>;
+  payload?: ReadonlyArray<{ payload?: unknown }>;
+}
+
+/** Vykreslí tooltip jen pro aktivní bod a předá mu řádek dat grafu. */
+function tip<T>(p: TipIn, render: (row: T) => ReactNode): ReactNode {
+  const row = p.active ? p.payload?.[0]?.payload : undefined;
+  return row ? render(row as T) : null;
 }
 
 /* ---------- Ziskovost podle oboru ---------- */
@@ -76,21 +83,20 @@ export function TradeChart({ rows, months }: { rows: TradeRow[]; months: number 
               <ReferenceLine x={0} stroke={chart.axis} />
               <Tooltip
                 cursor={{ fill: 'color-mix(in oklab, var(--color-ink) 7%, transparent)' }}
-                content={({ active, payload }: TipProps<(typeof data)[number]>) =>
-                  active && payload?.length ? (
+                content={(p: TipIn) => tip<(typeof data)[number]>(p, (row) => (
                     <ChartTip
-                      title={payload[0].payload.label}
+                      title={row.label}
                       rows={[
-                        { color: chart.revenue, label: 'Marže', value: `${fmt.czk(payload[0].payload.margin)} (${fmt.pct(payload[0].payload.marginPct)})`, strong: true },
-                        { label: 'Na hodinu práce', value: fmt.czk(payload[0].payload.marginPerHour) },
-                        { label: 'Zakázek', value: String(payload[0].payload.jobs) },
+                        { color: chart.revenue, label: 'Marže', value: `${fmt.czk(row.margin)} (${fmt.pct(row.marginPct)})`, strong: true },
+                        { label: 'Na hodinu práce', value: fmt.czk(row.marginPerHour) },
+                        { label: 'Zakázek', value: String(row.jobs) },
                       ]}
                     />
-                  ) : null
+                  ))
                 }
               />
               <Bar dataKey="pct" fill={chart.revenue} radius={[0, 4, 4, 0]} animationDuration={chart.motion.duration}>
-                <LabelList dataKey="pct" position="right" formatter={(v: number) => `${String(v).replace('.', ',')} %`} style={{ fill: chart.label, fontSize: 12 }} />
+                <LabelList dataKey="pct" position="right" formatter={(v: unknown) => `${String(v).replace('.', ',')} %`} style={{ fill: chart.label, fontSize: 12 }} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -167,17 +173,16 @@ export function CashflowChart({ weeks, startBalance, onBalance }: { weeks: CashW
                 <YAxis {...axis} axisLine={false} tickFormatter={fmt.czkShort} width={56} />
                 <Tooltip
                   cursor={{ fill: 'color-mix(in oklab, var(--color-ink) 7%, transparent)' }}
-                  content={({ active, payload }: TipProps<CashWeek>) =>
-                    active && payload?.length ? (
+                  content={(p: TipIn) => tip<CashWeek>(p, (row) => (
                       <ChartTip
-                        title={`Týden od ${payload[0].payload.label}`}
+                        title={`Týden od ${row.label}`}
                         rows={[
-                          { color: chart.revenue, label: 'Příjmy', value: fmt.czk(payload[0].payload.income) },
-                          { color: chart.cost, label: 'Výdaje', value: fmt.czk(payload[0].payload.expense) },
-                          { label: 'Stav účtu po týdnu', value: fmt.czk(payload[0].payload.balance), strong: true },
+                          { color: chart.revenue, label: 'Příjmy', value: fmt.czk(row.income) },
+                          { color: chart.cost, label: 'Výdaje', value: fmt.czk(row.expense) },
+                          { label: 'Stav účtu po týdnu', value: fmt.czk(row.balance), strong: true },
                         ]}
                       />
-                    ) : null
+                    ))
                   }
                 />
                 <Bar dataKey="income" fill={chart.revenue} radius={[4, 4, 0, 0]} animationDuration={chart.motion.duration} />
@@ -195,8 +200,7 @@ export function CashflowChart({ weeks, startBalance, onBalance }: { weeks: CashW
                 <ReferenceLine y={0} stroke={chart.crit} strokeDasharray="4 4" />
                 <Tooltip
                   cursor={{ stroke: chart.axis, strokeDasharray: '3 3' }}
-                  content={({ active, payload }: TipProps<CashWeek>) =>
-                    active && payload?.length ? <ChartTip title={`Po týdnu od ${payload[0].payload.label}`} rows={[{ color: chart.label, label: 'Stav účtu', value: fmt.czk(payload[0].payload.balance), strong: true }]} /> : null
+                  content={(p: TipIn) => tip<CashWeek>(p, (row) => <ChartTip title={`Po týdnu od ${row.label}`} rows={[{ color: chart.label, label: 'Stav účtu', value: fmt.czk(row.balance), strong: true }]} />)
                   }
                 />
                 <Line type="monotone" dataKey="balance" stroke={chart.label} strokeWidth={2} dot={false} activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }} animationDuration={chart.motion.duration} />
@@ -262,17 +266,16 @@ export function CapacityChart({ weeks }: { weeks: CapacityWeek[] }) {
               <ReferenceLine y={weeks[0]?.capacity} stroke={chart.axis} strokeDasharray="5 4" label={{ value: 'kapacita', position: 'insideTopRight', fill: chart.axis, fontSize: 12 }} />
               <Tooltip
                 cursor={{ fill: 'color-mix(in oklab, var(--color-ink) 7%, transparent)' }}
-                content={({ active, payload }: TipProps<CapacityWeek>) =>
-                  active && payload?.length ? (
+                content={(p: TipIn) => tip<CapacityWeek>(p, (row) => (
                     <ChartTip
-                      title={`Týden od ${payload[0].payload.label}`}
+                      title={`Týden od ${row.label}`}
                       rows={[
-                        { color: payload[0].payload.over ? WARN : chart.revenue, label: 'Naplánováno', value: `${payload[0].payload.planned} h`, strong: true },
-                        { label: 'Kapacita', value: `${payload[0].payload.capacity} h` },
-                        { label: payload[0].payload.over ? 'Chybí' : 'Volno', value: `${Math.abs(payload[0].payload.capacity - payload[0].payload.planned)} h` },
+                        { color: row.over ? WARN : chart.revenue, label: 'Naplánováno', value: `${row.planned} h`, strong: true },
+                        { label: 'Kapacita', value: `${row.capacity} h` },
+                        { label: row.over ? 'Chybí' : 'Volno', value: `${Math.abs(row.capacity - row.planned)} h` },
                       ]}
                     />
-                  ) : null
+                  ))
                 }
               />
               <Bar dataKey="planned" radius={[4, 4, 0, 0]} animationDuration={chart.motion.duration}>
