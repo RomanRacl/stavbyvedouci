@@ -1,18 +1,20 @@
 'use client';
 
 import { LayoutGroup, motion } from 'framer-motion';
-import { Search, TrendingDown } from 'lucide-react';
+import { Search, TrendingDown, Wrench } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { fmt, jobFinancials } from '@/features/analytics/lib/metrics';
+import { extraWorkOf } from '@/lib/jobDefaults';
 import type { Job, JobStatus } from '@/types/firestore';
 
 const FILTERS: Array<{ id: 'all' | JobStatus; label: string }> = [
-  { id: 'all', label: 'Vše' },
+  { id: 'all', label: 'Aktivní' },
   { id: 'awaiting_approval', label: 'Ke schválení' },
   { id: 'in_progress', label: 'Probíhá' },
   { id: 'scheduled', label: 'Naplánováno' },
   { id: 'approved', label: 'Schváleno' },
+  { id: 'invoiced', label: 'Archiv' },
 ];
 
 /** Co vyžaduje akci majitele, jde nahoru. */
@@ -36,7 +38,8 @@ export function JobList({ jobs, selectedId, onSelect }: Props) {
   const [q, setQ] = useState('');
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: jobs.length };
+    // „Aktivní“ = vše kromě vyfakturovaných, které jsou v Archivu.
+    const c: Record<string, number> = { all: jobs.filter((j) => j.status !== 'invoiced').length };
     jobs.forEach((j) => (c[j.status] = (c[j.status] ?? 0) + 1));
     return c;
   }, [jobs]);
@@ -44,7 +47,7 @@ export function JobList({ jobs, selectedId, onSelect }: Props) {
   const visible = useMemo(() => {
     const needle = q.trim().toLocaleLowerCase('cs');
     return jobs
-      .filter((j) => filter === 'all' || j.status === filter)
+      .filter((j) => (filter === 'all' ? j.status !== 'invoiced' : j.status === filter))
       .filter(
         (j) =>
           !needle ||
@@ -130,6 +133,11 @@ export function JobList({ jobs, selectedId, onSelect }: Props) {
                       <span className="flex items-center gap-2">
                         <span className="font-display text-sm font-semibold text-ink-2 tabular-nums">{job.code}</span>
                         <StatusPill status={job.status} />
+                        {extraWorkOf(job).some((e) => e.status === 'pending') && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-warn/12 px-2 py-0.5 text-xs font-medium text-warn-ink">
+                            <Wrench className="size-3" aria-hidden /> vícepráce
+                          </span>
+                        )}
                       </span>
                       <span className="mt-1 block truncate font-medium text-ink group-hover:underline group-hover:underline-offset-4">
                         {job.title}

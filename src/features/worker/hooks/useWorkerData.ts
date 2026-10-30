@@ -1,21 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { getSnapshot, type Snapshot } from '@/lib/mock/localBackend';
-import { subscribeStore } from '@/lib/mock/localStore';
+import { useSnapshot } from '@/lib/mock/useSnapshot';
 
 const WORKER_KEY = 'stavbyvedouci:worker';
 
 /** Data pro mobil dělníka – stejný zdroj jako dashboard, změny se propisují živě. */
-export function useWorkerData() {
-  const [snap, setSnap] = useState<Snapshot | null>(null);
-  useEffect(() => {
-    const pull = () => setSnap(getSnapshot());
-    pull();
-    return subscribeStore(pull);
-  }, []);
-  return snap;
-}
+export const useWorkerData = useSnapshot;
 
 /**
  * Kdo je přihlášený. Do zapojení Firebase Auth si dělník vybere sám sebe

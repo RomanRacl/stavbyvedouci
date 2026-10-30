@@ -56,7 +56,7 @@ function EndLabel(name: string, count: number) {
   return function Label(props: { x?: number | string; y?: number | string; index?: number }) {
     if (props.index !== count - 1) return null;
     return (
-      <text x={Number(props.x) + 10} y={Number(props.y)} dy={4} fontSize={chart.font} fill="#4a5561">
+      <text x={Number(props.x) + 10} y={Number(props.y)} dy={4} fontSize={chart.font} fill={chart.label}>
         {name}
       </text>
     );

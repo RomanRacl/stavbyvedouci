@@ -1,14 +1,40 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronRight, MapPin, Play } from 'lucide-react';
+import { CalendarClock, ChevronRight, Hand, MapPin, Play } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { Toast, type ToastMsg } from '@/components/ui/Toast';
 import { fmt } from '@/features/analytics/lib/metrics';
-import { issueMaterial, setProgress, startWork, stopWork, submitForApproval } from '@/lib/mock/localBackend';
+import {
+  addExtraWork,
+  addNote,
+  addPhotos,
+  confirmDay,
+  deletePhoto,
+  issueMaterial,
+  pauseWork,
+  resumeWork,
+  returnMaterial,
+  confirmSafety,
+  setStageProgress,
+  switchStage,
+  setPhotoTag,
+  setProgress,
+  startWork,
+  stopWork,
+  submitForApproval,
+  toggleChecklistItem,
+} from '@/lib/mock/localBackend';
+import { dayKey } from '@/lib/jobDefaults';
+import { stockAt, vanOf } from '@/lib/stock';
+import { needsSafety } from '@/lib/operations';
+import { useGloves } from '@/lib/theme';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { SafetySheet } from './components/SafetySheet';
 import type { Job } from '@/types/firestore';
+import { DayReportSheet } from './components/DayReportSheet';
 import { MaterialSheet } from './components/MaterialSheet';
 import { TimerButton } from './components/TimerButton';
 import { WorkerJobView } from './components/WorkerJobView';
@@ -71,6 +97,9 @@ export default function WorkerApp() {
   const clearToast = useCallback(() => setToast(null), []);
   const say = (text: string, tone: ToastMsg['tone'] = 'success') => setToast({ text, tone, id: Date.now() });
   const [materialOpen, setMaterialOpen] = useState(false);
+  const [dayOpen, setDayOpen] = useState(false);
+  const [safetyFor, setSafetyFor] = useState<{ job: Job; stageId: string | null } | null>(null);
+  const [gloves, toggleGloves] = useGloves();
 
   /* Otevřená zakázka v URL (?job=…): tlačítko Zpět v telefonu ji zavře. */
   const params = useSearchParams();
@@ -101,23 +130,45 @@ export default function WorkerApp() {
 
   /* ---------- akce: okamžitý zápis + potvrzení vibrací a toastem ---------- */
 
-  const start = (job: Job) => {
+  const start = (job: Job, stageId: string | null = job.stages?.find((s) => !s.doneAt)?.id ?? null, confirmed = false) => {
     buzz();
-    const { stoppedJob, stoppedMinutes } = startWork(me.uid, job.id);
+    // Na novou stavbu nejdřív poučení BOZP – jednou na zakázku.
+    if (!confirmed && needsSafety(job, me.uid)) {
+      setSafetyFor({ job, stageId });
+      return;
+    }
+    const { stoppedJob, stoppedMinutes } = startWork(me.uid, job.id, stageId);
     say(
       stoppedJob
         ? `Ukončeno na ${stoppedJob.code} (${formatMinutes(stoppedMinutes)}), měřím na ${job.code}.`
         : `Měřím čas na ${job.code}.`,
     );
   };
-  const stop = () => {
+  const stop = (endAt?: Date) => {
     buzz();
-    const { minutes, job } = stopWork(me.uid);
+    const { minutes, job } = stopWork(me.uid, endAt);
     if (job) say(`Zapsáno ${formatMinutes(minutes)} na ${job.code}.`);
   };
+  const pause = () => {
+    buzz();
+    pauseWork(me.uid);
+    say('Přestávka. Čas se teď nepočítá.');
+  };
+  const resume = () => {
+    buzz();
+    resumeWork(me.uid);
+    say('Pokračujete, čas se zase měří.');
+  };
+  const today = dayKey();
+  const dayConfirmedAt = snap.dayReports[`${me.uid}_${today}`] ?? null;
+  const myLogs = snap.timeLogs.filter((l) => l.workerId === me.uid);
+  const myVan = vanOf(snap.vans, me.uid);
+  const vanStock = myVan
+    ? Object.fromEntries(snap.catalog.map((c) => [c.id, stockAt(c, snap.stockMoves, `van:${myVan.id}`)]))
+    : null;
 
   return (
-    <div className="min-h-dvh bg-concrete">
+    <div className="worker-root min-h-dvh bg-concrete">
       <main className="mx-auto max-w-md px-4 pt-6 pb-16">
         <header className="flex items-center gap-3">
           <span className="grid size-11 place-items-center rounded-full bg-ink font-display font-semibold text-white">{me.initials}</span>
@@ -125,9 +176,23 @@ export default function WorkerApp() {
             <p className="text-sm text-ink-2">{new Date().toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
             <h1 className="truncate font-display text-xl font-bold text-ink">{me.displayName}</h1>
           </div>
-          <button type="button" onClick={() => setUid(null)} className="h-11 rounded-xl px-3 text-sm font-medium text-ink-2 active:bg-surface">
-            Nejsem to já
+          <button
+            type="button"
+            onClick={() => setDayOpen(true)}
+            className="flex h-11 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-sm font-medium text-ink active:bg-concrete"
+          >
+            <CalendarClock className="size-4" /> Můj den
           </button>
+          <button
+            type="button"
+            onClick={toggleGloves}
+            aria-pressed={gloves}
+            aria-label={gloves ? 'Vypnout režim pro rukavice' : 'Zapnout režim pro rukavice (větší tlačítka)'}
+            className={`grid size-11 place-items-center rounded-xl border ${gloves ? 'border-ink bg-ink text-white' : 'border-line bg-surface text-ink-2'}`}
+          >
+            <Hand className="size-5" />
+          </button>
+          <ThemeToggle className="size-11 rounded-xl border border-line bg-surface" />
         </header>
 
         {/* Běžící měření je vždy nahoře, ať je zakázka otevřená, nebo ne. */}
@@ -145,7 +210,7 @@ export default function WorkerApp() {
                 <span className="min-w-0 truncate">{timerJob.title}</span>
                 <ChevronRight className="size-4 shrink-0 text-ink-3" />
               </button>
-              <TimerButton running={timer} switching={false} onStart={() => undefined} onStop={stop} />
+              <TimerButton running={timer} switching={false} onStart={() => undefined} onStop={stop} onPause={pause} onResume={resume} />
             </motion.section>
           )}
         </AnimatePresence>
@@ -196,6 +261,10 @@ export default function WorkerApp() {
             </ul>
           </section>
         )}
+
+        <button type="button" onClick={() => setUid(null)} className="mx-auto mt-10 block h-11 rounded-xl px-4 text-sm font-medium text-ink-3 active:bg-surface">
+          Nejsem {me.displayName.split(' ')[0]}, přepnout
+        </button>
       </main>
 
       <AnimatePresence>
@@ -205,14 +274,43 @@ export default function WorkerApp() {
             job={openJob}
             myTimer={timer}
             onBack={() => open(null)}
-            onStart={() => start(openJob)}
+            onStart={(stageId) => start(openJob, stageId)}
+            onStageProgress={(stageId, pct) => setStageProgress(me.uid, openJob.id, stageId, pct)}
+            onSwitchStage={(stageId) => {
+              switchStage(me.uid, stageId);
+              say(`Čas se teď měří na etapu ${openJob.stages?.find((s) => s.id === stageId)?.name ?? ''}.`);
+            }}
             onStop={stop}
-            onProgress={(p) => setProgress(openJob.id, p)}
+            onPause={pause}
+            onResume={resume}
+            onProgress={(p) => setProgress(openJob.id, p, me.uid)}
             onOpenMaterial={() => setMaterialOpen(true)}
-            onSubmit={() => {
-              submitForApproval(me.uid, openJob.id);
+            onSubmit={(h) => {
+              submitForApproval(me.uid, openJob.id, h);
               say(`${openJob.code} předána ke schválení.`);
               open(null);
+            }}
+            notes={snap.notes.filter((n) => n.jobId === openJob.id)}
+            onSendNote={(text) => addNote(me.uid, openJob.id, text)}
+            onToggleCheck={(itemId) => toggleChecklistItem(me.uid, openJob.id, itemId)}
+            onAddExtra={(input) => {
+              addExtraWork(me.uid, openJob.id, input);
+              say('Vícepráce odeslána do kanceláře ke schválení.');
+            }}
+            onTagPhoto={(p, tag) => setPhotoTag(p.id, tag)}
+            photos={snap.photos.filter((p) => p.jobId === openJob.id)}
+            members={snap.members}
+            myUid={me.uid}
+            onAddPhotos={async (files) => {
+              const saved = await addPhotos(me.uid, openJob.id, files);
+              if (saved === files.length) say(saved === 1 ? 'Fotka uložena.' : `${saved < 5 ? 'Uloženy' : 'Uloženo'} ${saved} ${saved < 5 ? 'fotky' : 'fotek'}.`);
+              else if (saved > 0) say(`Uloženo ${saved} z ${files.length} fotek. Ostatní se nepodařilo načíst.`, 'error');
+              else say('Fotku se nepodařilo uložit. Zkuste ji vyfotit znovu.', 'error');
+              return saved;
+            }}
+            onDeletePhoto={(p) => {
+              void deletePhoto(p.id);
+              say('Fotka smazána.');
             }}
           />
         )}
@@ -222,6 +320,8 @@ export default function WorkerApp() {
         <MaterialSheet
           job={openJob}
           catalog={snap.catalog}
+          vanStock={vanStock}
+          vanName={myVan ? `${myVan.name} ${myVan.plate}` : null}
           open={materialOpen}
           onClose={() => setMaterialOpen(false)}
           onSubmit={(items) => {
@@ -230,8 +330,41 @@ export default function WorkerApp() {
             buzz();
             say(`Výdej zapsán na ${openJob.code}.`);
           }}
+          onReturn={(items) => {
+            returnMaterial(me.uid, openJob.id, items);
+            setMaterialOpen(false);
+            buzz();
+            say(myVan ? 'Vráceno do auta, náklady zakázky sníženy.' : 'Vráceno do skladu, náklady zakázky sníženy.');
+          }}
         />
       )}
+
+      <SafetySheet
+        job={safetyFor?.job ?? null}
+        open={Boolean(safetyFor)}
+        onClose={() => setSafetyFor(null)}
+        onConfirm={() => {
+          if (!safetyFor) return;
+          confirmSafety(me.uid, safetyFor.job.id);
+          const { job, stageId } = safetyFor;
+          setSafetyFor(null);
+          start(job, stageId, true);
+        }}
+      />
+
+      <DayReportSheet
+        open={dayOpen}
+        onClose={() => setDayOpen(false)}
+        logs={myLogs}
+        timer={timer}
+        jobs={snap.jobs}
+        confirmedAt={dayConfirmedAt}
+        onConfirm={() => {
+          confirmDay(me.uid, today);
+          buzz();
+          say('Výkaz za dnešek je potvrzený.');
+        }}
+      />
 
       <Toast message={toast} onDone={clearToast} />
     </div>

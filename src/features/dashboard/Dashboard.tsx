@@ -1,13 +1,27 @@
 'use client';
 
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
-import { AlertCircle, CheckCircle2, ClipboardList, Plus, Smartphone, WifiOff } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ClipboardList, Plus, WifiOff } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { companyKpis } from '@/features/analytics/lib/metrics';
 import { USE_MOCK, useDashboardData } from '@/features/jobs/hooks/useDashboardData';
 import { useOptimisticJobs } from '@/features/jobs/hooks/useOptimisticJobs';
-import { setMaterialPlan } from '@/lib/mock/localBackend';
+import {
+  addNote,
+  decideExtraWork,
+  deleteJob,
+  deletePhoto,
+  setChecklist,
+  setMaterialPlan,
+  setPhotoTag,
+  templateFromJob,
+  updateJob,
+  createOrder,
+} from '@/lib/mock/localBackend';
+import { jobShortages, stockRows } from '@/lib/stock';
+import { allAlerts, jobAlerts } from '@/lib/analytics';
+import Link from 'next/link';
 import type { Job } from '@/types/firestore';
 import { JobDetail } from './components/JobDetail';
 import { JobList } from './components/JobList';
@@ -120,6 +134,7 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
   const showError = useCallback((text: string) => setToast({ text, tone: 'error' }), []);
   const { jobs, mutate, isPending } = useOptimisticJobs(data.jobs, showError);
   const [newJobOpen, setNewJobOpen] = useState(false);
+  const [editing, setEditing] = useState<Job | null>(null);
   const [planOpen, setPlanOpen] = useState(false);
 
   const [weeks, setWeeks] = useState<number>(12);
@@ -137,6 +152,13 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
   }, []);
 
   const selected: Job | null = useMemo(() => jobs.find((j) => j.id === selectedId) ?? null, [jobs, selectedId]);
+  /** Co chybí na vybranou zakázku, seskupeno podle dodavatele. */
+  const shortages = useMemo(
+    () => (selected ? jobShortages(selected, stockRows(data.catalog, data.stockMoves, data.vans), data.vans) : {}),
+    [selected, data.catalog, data.stockMoves, data.vans],
+  );
+  const shortageCount = Object.values(shortages).reduce((a, l) => a + l.length, 0);
+  const alertJobs = useMemo(() => [...new Map(allAlerts(jobs).map((a) => [a.job.id, a.job])).values()], [jobs]);
   const visibleStats = useMemo(() => data.weeklyStats.slice(-weeks), [data.weeklyStats, weeks]);
   const kpis = useMemo(
     () => companyKpis(data.weeklyStats, jobs, Math.min(4, Math.floor(data.weeklyStats.length / 2) || 1)),
@@ -193,7 +215,7 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
   }, [selectedId, materialsOpen, newJobOpen, planOpen, select]);
 
   return (
-    <div className="min-h-dvh bg-concrete">
+    <div>
       <div className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
         {/* Hlavička + filtr období v jedné řadě nad grafy */}
         <header className="mb-6 flex flex-wrap items-end gap-x-6 gap-y-3">
@@ -225,17 +247,12 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
               })}
             </div>
           </LayoutGroup>
-          <a
-            href="/w"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink-2 transition hover:text-ink focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:outline-none"
-          >
-            <Smartphone className="size-4" /> Pohled dělníka
-          </a>
           <button
             type="button"
-            onClick={() => setNewJobOpen(true)}
+            onClick={() => {
+              setEditing(null);
+              setNewJobOpen(true);
+            }}
             disabled={data.status === 'loading'}
             className="inline-flex h-10 items-center gap-2 rounded-lg bg-ink px-4 text-sm font-semibold text-white transition hover:bg-ink/90 focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-[0.97] disabled:opacity-50"
           >
@@ -247,6 +264,19 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
           <Skeleton />
         ) : (
           <div className="space-y-5">
+            {alertJobs.length > 0 && (
+              <Link
+                href="/analytika"
+                className="flex items-center gap-3 rounded-xl border border-warn/40 bg-warn/8 px-4 py-3 text-sm transition hover:bg-warn/12"
+              >
+                <AlertCircle className="size-5 shrink-0 text-warn-ink" />
+                <span className="min-w-0 flex-1 text-ink">
+                  <strong>{alertJobs.length}</strong> {alertJobs.length === 1 ? 'zakázka potřebuje' : alertJobs.length < 5 ? 'zakázky potřebují' : 'zakázek potřebuje'} pozornost:{' '}
+                  <span className="text-ink-2">{alertJobs.slice(0, 3).map((j) => j.code).join(', ')}{alertJobs.length > 3 ? ' a další' : ''}</span>
+                </span>
+                <span className="shrink-0 font-medium text-series-1-ink">Zobrazit</span>
+              </Link>
+            )}
             <KpiStrip kpis={kpis} windowWeeks={4} />
             <RevenueCostChart stats={visibleStats} />
 
@@ -267,11 +297,50 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
                       key={selected.id}
                       job={selected}
                       members={data.members}
+                      photos={data.photos.filter((p) => p.jobId === selected.id)}
+                      onDeletePhoto={(p) => {
+                        void deletePhoto(p.id);
+                        setToast({ text: 'Fotka smazána.', tone: 'success' });
+                      }}
                       approving={isPending(selected.id)}
                       onApprove={() => approve(selected)}
                       onOpenMaterials={() => setMaterialsOpen(true)}
                       onPlanMaterials={() => setPlanOpen(true)}
                       onBack={() => select(null)}
+                      onTagPhoto={(p, tag) => setPhotoTag(p.id, tag)}
+                      notes={data.notes.filter((n) => n.jobId === selected.id)}
+                      myUid={currentUid}
+                      onSendNote={(text) => addNote(currentUid, selected.id, text)}
+                      onEdit={() => {
+                        setEditing(selected);
+                        setNewJobOpen(true);
+                      }}
+                      onDelete={() => {
+                        deleteJob(selected.id);
+                        select(null);
+                        setToast({ text: `Zakázka ${selected.code} je smazaná.`, tone: 'success' });
+                      }}
+                      onDecideExtra={(extraId, d) => {
+                        decideExtraWork(selected.id, extraId, d);
+                        setToast({ text: d.approve ? 'Vícepráce schválena, cena zakázky navýšena.' : 'Vícepráce zamítnuta.', tone: 'success' });
+                      }}
+                      onSetChecklist={(items) => setChecklist(selected.id, items)}
+                      settings={data.settings}
+                      onToast={(text) => setToast({ text, tone: 'success' })}
+                      alerts={jobAlerts(selected)}
+                      ops={{ timeLogs: data.timeLogs, usage: data.usage, audit: data.audit, catalog: data.catalog }}
+                      shortageCount={shortageCount}
+                      onOrderMissing={() => {
+                        const created = Object.entries(shortages).map(([supplier, lines]) => createOrder(supplier, lines, selected.id));
+                        setToast({
+                          text: `Připraveno ${created.length === 1 ? `${created[0].number}` : `${created.length} objednávek`} v Objednávkách, zkontrolujte a odešlete.`,
+                          tone: 'success',
+                        });
+                      }}
+                      onSaveTemplate={(name) => {
+                        templateFromJob(selected, name);
+                        setToast({ text: `Šablona „${name}“ uložena, najdete ji v Šablonách.`, tone: 'success' });
+                      }}
                     />
                   ) : (
                     <motion.div key="empty" className="h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -310,10 +379,24 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
       />
       <NewJobDrawer
         open={newJobOpen}
-        onClose={() => setNewJobOpen(false)}
+        onClose={() => {
+          setNewJobOpen(false);
+          setEditing(null);
+        }}
         members={data.members}
         existingJobs={jobs}
+        templates={data.templates}
+        catalog={data.catalog}
+        settings={data.settings}
+        certificates={data.certificates}
         onCreate={createJob}
+        editing={editing}
+        onUpdate={(jobId, patch) => {
+          updateJob(jobId, patch);
+          setNewJobOpen(false);
+          setEditing(null);
+          setToast({ text: 'Změny zakázky jsou uložené.', tone: 'success' });
+        }}
       />
       <Toast message={toast} onDone={clearToast} />
     </div>

@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { Job, MaterialItem, Member, PeriodStat } from '@/types/firestore';
-import { mockWeeklyStats } from '@/lib/mock/dashboard.mock';
+import type { AuditEntry, Certificate, MaterialUsage, TimeLog, CompanySettings, Job, JobNote, JobPhoto, JobTemplate, MaterialItem, Member, PeriodStat, StockMove, Van } from '@/types/firestore';
+import { mockSettings, mockWeeklyStats } from '@/lib/mock/dashboard.mock';
 import { createJob, getSnapshot, patchJob } from '@/lib/mock/localBackend';
 import { subscribeStore } from '@/lib/mock/localStore';
 
@@ -14,6 +14,17 @@ export interface DashboardData {
   weeklyStats: PeriodStat[];
   /** Katalog materiálu firmy (companies/{cid}/materials). */
   catalog: MaterialItem[];
+  vans: Van[];
+  stockMoves: StockMove[];
+  templates: JobTemplate[];
+  settings: CompanySettings;
+  timeLogs: TimeLog[];
+  audit: AuditEntry[];
+  usage: MaterialUsage[];
+  certificates: Certificate[];
+  /** Metadata fotek z terénu (companies/{cid}/photos). */
+  photos: JobPhoto[];
+  notes: JobNote[];
   status: 'loading' | 'live' | 'offline' | 'error';
   lastEventAt: Date | null;
 }
@@ -35,6 +46,16 @@ export function useDashboardData(companyId: string): DashboardDataApi {
     members: [],
     weeklyStats: [],
     catalog: [],
+    vans: [],
+    stockMoves: [],
+    templates: [],
+    settings: mockSettings,
+    timeLogs: [],
+    audit: [],
+    usage: [],
+    certificates: [],
+    photos: [],
+    notes: [],
     status: 'loading',
     lastEventAt: null,
   });
@@ -50,6 +71,16 @@ export function useDashboardData(companyId: string): DashboardDataApi {
           members: snap.members,
           weeklyStats: mockWeeklyStats,
           catalog: snap.catalog,
+          vans: snap.vans,
+          stockMoves: snap.stockMoves,
+          templates: snap.templates,
+          settings: snap.settings,
+          timeLogs: snap.timeLogs,
+          audit: snap.audit,
+          usage: snap.usage,
+          certificates: snap.certificates,
+          photos: snap.photos,
+          notes: snap.notes,
           status: 'live',
           lastEventAt: new Date(),
         }));

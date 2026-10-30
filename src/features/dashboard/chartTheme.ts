@@ -1,16 +1,19 @@
 /**
- * Barvy pro SVG grafy (Recharts bere hex do atributů spolehlivěji než CSS proměnné).
- * Kategorické sloty 1–2 z validované palety (sousední CVD ΔE ≥ 9). Stavové barvy
- * se pro série nepoužívají – patří jen stavům (OK / pozor / kritické).
+ * Barvy grafů jako CSS proměnné – Recharts je předá do SVG, takže grafy se samy
+ * přebarví v tmavém režimu. Kategorické sloty 1–2 jsou ověřené validátorem palety
+ * pro světlý i tmavý povrch (sousední CVD ΔE ≥ 24). Stavové barvy patří jen stavům.
  */
 export const chart = {
-  revenue: '#2a78d6', // slot 1 – tržby
-  cost: '#eb6834', // slot 2 – náklady
-  budget: '#b9c0c8', // neutrální reference (rozpočet)
-  spent: '#2a78d6',
-  grid: '#e6e9ec',
-  axis: '#7b8591',
-  surface: '#ffffff',
+  revenue: 'var(--color-series-1)', // slot 1 – tržby, příjmy
+  cost: 'var(--color-series-2)', // slot 2 – náklady, výdaje
+  budget: 'var(--color-mark-neutral)', // neutrální reference (rozpočet)
+  spent: 'var(--color-series-1)',
+  grid: 'var(--color-line)',
+  axis: 'var(--color-ink-3)',
+  label: 'var(--color-ink-2)',
+  surface: 'var(--color-surface)',
+  warn: 'var(--color-warn)',
+  crit: 'var(--color-crit)',
   font: 12,
   motion: { duration: 900, easing: 'ease-out' as const },
 };

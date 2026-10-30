@@ -109,8 +109,8 @@ export function MaterialDrawer({ companyId, job, members, open, onClose }: Props
                         <span className="block text-xs text-ink-3">{fmt.dateTime(u.usedAt)}</span>
                       </span>
                       <span className="text-right tabular-nums">
-                        <span className="block font-medium text-ink">
-                          {fmt.num(u.qty)} {l.unit}
+                        <span className={`block font-medium ${u.qty < 0 ? 'text-good-ink' : 'text-ink'}`}>
+                          {u.qty < 0 ? `vráceno ${fmt.num(-u.qty)}` : fmt.num(u.qty)} {l.unit}
                         </span>
                         <span className="block text-xs text-ink-3">{fmt.czk(u.qty * u.unitCostSnapshot)}</span>
                       </span>
