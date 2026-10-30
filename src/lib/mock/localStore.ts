@@ -1,4 +1,22 @@
-import type { ActiveTimer, Job, MaterialUsage } from '@/types/firestore';
+import type {
+  ActiveTimer,
+  AuditEntry,
+  Certificate,
+  Client,
+  RecurringPlan,
+  CompanySettings,
+  Job,
+  JobNote,
+  JobPhoto,
+  JobTemplate,
+  MaterialItem,
+  MaterialUsage,
+  PurchaseOrder,
+  Quote,
+  StockMove,
+  Supplier,
+  TimeLog,
+} from '@/types/firestore';
 
 /**
  * Úložiště v prohlížeči pro režim bez Firebase.
@@ -13,9 +31,47 @@ export interface Stored {
   patches: Record<string, Partial<Job>>;
   timers: Record<string, ActiveTimer | null>; // uid -> běžící měření (null = zastaveno)
   usage: MaterialUsage[];
+  photos: JobPhoto[]; // jen metadata, soubory jsou v IndexedDB (photoBlobs.ts)
+  deleted: string[]; // smazané zakázky (i ukázkové)
+  notes: JobNote[];
+  timeLogs: TimeLog[];
+  dayReports: Record<string, Date>; // `${uid}_${YYYY-MM-DD}` -> kdy potvrzeno
+  /** Upravený katalog; null = ukázkový katalog beze změn. */
+  catalog: MaterialItem[] | null;
+  stockMoves: StockMove[];
+  orders: PurchaseOrder[];
+  templates: JobTemplate[] | null;
+  suppliers: Supplier[] | null;
+  settings: CompanySettings | null;
+  quotes: Quote[] | null;
+  audit: AuditEntry[];
+  clients: Client[];
+  recurring: RecurringPlan[] | null;
+  certificates: Certificate[] | null;
 }
 
-const EMPTY: Stored = { created: [], patches: {}, timers: {}, usage: [] };
+const EMPTY: Stored = {
+  created: [],
+  patches: {},
+  timers: {},
+  usage: [],
+  photos: [],
+  deleted: [],
+  notes: [],
+  timeLogs: [],
+  dayReports: {},
+  catalog: null,
+  stockMoves: [],
+  orders: [],
+  templates: null,
+  suppliers: null,
+  settings: null,
+  quotes: null,
+  audit: [],
+  clients: [],
+  recurring: null,
+  certificates: null,
+};
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 const reviveDates = (_k: string, v: unknown) => (typeof v === 'string' && ISO_DATE.test(v) ? new Date(v) : v);

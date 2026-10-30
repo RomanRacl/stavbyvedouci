@@ -26,6 +26,110 @@
   --color-warn-ink: #8a5a00;
   --color-crit: #c8372d;
   --color-crit-ink: #a92b22;
+  --color-mark-neutral: #b9c0c8;
+}
+
+/*
+ * Tmavý režim: stejné role, jiné hodnoty. Volba uživatele (data-theme) má přednost
+ * před nastavením systému. Barvy grafů ověřené validátorem palety i pro tmavý povrch.
+ */
+:root[data-theme='dark'] {
+  --color-concrete: #0f1419;
+  --color-surface: #171e25;
+  --color-line: #2b343e;
+  --color-ink: #e8ecf0;
+  --color-ink-2: #a9b3bd;
+  --color-ink-3: #8a95a0;
+  --color-series-1: #3987e5;
+  --color-series-1-ink: #82b3f0;
+  --color-series-2: #d95926;
+  --color-good: #2fa865;
+  --color-good-ink: #5cc98a;
+  --color-warn: #c98500;
+  --color-warn-ink: #e6ad3f;
+  --color-crit: #e0574d;
+  --color-crit-ink: #f08b83;
+  --color-mark-neutral: #4a5561;
+  /* „Bílý“ text na tmavých tlačítkách: v tmavém režimu jsou tlačítka světlá, text tmavý. */
+  --color-white: #0f161d;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+  --color-concrete: #0f1419;
+  --color-surface: #171e25;
+  --color-line: #2b343e;
+  --color-ink: #e8ecf0;
+  --color-ink-2: #a9b3bd;
+  --color-ink-3: #8a95a0;
+  --color-series-1: #3987e5;
+  --color-series-1-ink: #82b3f0;
+  --color-series-2: #d95926;
+  --color-good: #2fa865;
+  --color-good-ink: #5cc98a;
+  --color-warn: #c98500;
+  --color-warn-ink: #e6ad3f;
+  --color-crit: #e0574d;
+  --color-crit-ink: #f08b83;
+  --color-mark-neutral: #4a5561;
+  /* „Bílý“ text na tmavých tlačítkách: v tmavém režimu jsou tlačítka světlá, text tmavý. */
+  --color-white: #0f161d;
+  color-scheme: dark;
+  }
+}
+/* Dokumenty k tisku jsou vždy světlé – i na obrazovce v tmavém režimu. */
+.theme-light,
+:root .theme-light {
+  --color-concrete: #eef0f2;
+  --color-surface: #ffffff;
+  --color-line: #dde1e5;
+  --color-ink: #16202a;
+  --color-ink-2: #4a5561;
+  --color-ink-3: #7b8591;
+  --color-series-1: #2a78d6;
+  --color-series-1-ink: #1f5fae;
+  --color-series-2: #eb6834;
+  --color-good: #1f8a4c;
+  --color-good-ink: #17703d;
+  --color-warn: #c98500;
+  --color-warn-ink: #8a5a00;
+  --color-crit: #c8372d;
+  --color-crit-ink: #a92b22;
+  --color-mark-neutral: #b9c0c8;
+  --color-white: #ffffff;
+  color-scheme: light;
+  background-color: var(--color-concrete);
+  color: var(--color-ink);
+}
+@media print {
+  :root, :root[data-theme='dark'] {
+  --color-concrete: #eef0f2;
+  --color-surface: #ffffff;
+  --color-line: #dde1e5;
+  --color-ink: #16202a;
+  --color-ink-2: #4a5561;
+  --color-ink-3: #7b8591;
+  --color-series-1: #2a78d6;
+  --color-series-1-ink: #1f5fae;
+  --color-series-2: #eb6834;
+  --color-good: #1f8a4c;
+  --color-good-ink: #17703d;
+  --color-warn: #c98500;
+  --color-warn-ink: #8a5a00;
+  --color-crit: #c8372d;
+  --color-crit-ink: #a92b22;
+  --color-mark-neutral: #b9c0c8;
+  --color-white: #ffffff;
+  color-scheme: light;
+  }
+}
+
+/* Režim pro rukavice (mobil dělníka): všechno o pětinu větší – rem škáluje text i dotykové plochy. */
+:root[data-gloves='on'] {
+  font-size: 118%;
+}
+:root[data-gloves='on'] .worker-root {
+  --color-line: color-mix(in oklab, var(--color-ink-3) 70%, transparent);
 }
 
 /* Užší řez Archiva pro čísla, kódy zakázek a nadpisy – „technický výkres“. */
@@ -56,5 +160,16 @@
       animation-duration: 0.01ms !important;
       transition-duration: 0.01ms !important;
     }
+  }
+}
+
+/* Tisk dokumentů (objednávky, později nabídky): A4 s okraji, bez pozadí aplikace. */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 16mm;
+  }
+  body {
+    background: white;
   }
 }
