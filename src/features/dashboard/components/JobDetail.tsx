@@ -379,7 +379,7 @@ export function JobDetail({
                 <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={64} tick={{ fill: chart.label, fontSize: 13 }} />
                 <Tooltip
                   cursor={{ fill: 'color-mix(in oklab, var(--color-ink) 7%, transparent)' }}
-                  formatter={(v: number, n: string) => [fmt.czk(v), n === 'budget' ? 'Rozpočet' : 'Čerpáno']}
+                  formatter={(v, n) => [fmt.czk(Number(v)), n === 'budget' ? 'Rozpočet' : 'Čerpáno']}
                   contentStyle={{ borderRadius: 8, border: '1px solid #dde1e5', fontSize: 13 }}
                 />
                 <Bar dataKey="budget" fill={chart.budget} radius={[0, 4, 4, 0]} animationDuration={chart.motion.duration} />
