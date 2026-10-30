@@ -1,0 +1,18 @@
+rules_version = '2';
+// Fotky z terénu: jen členové firmy, jen obrázky, max. 5 MB (telefon je předem zmenší na ~0,3 MB).
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /companies/{cid}/jobs/{jobId}/photos/{file} {
+      function inCompany() { return request.auth != null && request.auth.token.companyId == cid; }
+      function isOffice()  { return inCompany() && request.auth.token.role in ['owner', 'manager']; }
+
+      allow read: if inCompany();
+      allow create: if inCompany()
+        && request.resource.contentType.matches('image/.*')
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.metadata.workerId == request.auth.uid;
+      // Dělník maže jen vlastní fotky, kancelář všechny.
+      allow delete: if isOffice() || (inCompany() && resource.metadata.workerId == request.auth.uid);
+    }
+  }
+}

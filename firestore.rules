@@ -53,6 +53,65 @@ service cloud.firestore {
         allow update, delete: if isOffice(cid);
       }
 
+      match /photos/{photoId} {
+        allow read: if inCompany(cid);
+        allow create: if inCompany(cid) && request.resource.data.workerId == request.auth.uid;
+        allow update: if false;
+        allow delete: if isOffice(cid) || (inCompany(cid) && resource.data.workerId == request.auth.uid);
+      }
+
+      match /vans/{vanId} {
+        allow read: if inCompany(cid);
+        allow write: if isOffice(cid);
+      }
+
+      // Kniha pohybů skladu: dělník zapisuje jen vlastní výdeje a vratky, převody a příjmy kancelář.
+      match /stockMoves/{id} {
+        allow read: if inCompany(cid);
+        allow create: if isOffice(cid)
+          || (inCompany(cid) && request.resource.data.by == request.auth.uid
+              && request.resource.data.kind in ['issue', 'return']);
+        allow update, delete: if false;
+      }
+
+      match /orders/{orderId} {
+        allow read, write: if isOffice(cid);
+      }
+
+      match /templates/{id} {
+        allow read: if inCompany(cid);
+        allow write: if isOffice(cid);
+      }
+
+      match /suppliers/{id} {
+        allow read, write: if isOffice(cid);
+      }
+
+      match /quotes/{quoteId} {
+        allow read, write: if isOffice(cid);
+      }
+
+      match /clients/{clientId} {
+        allow read, write: if isOffice(cid);
+      }
+
+      match /recurring/{id} {
+        allow read, write: if isOffice(cid);
+      }
+
+      // Oprávnění: člověk vidí svá, kancelář všechna.
+      match /certificates/{id} {
+        allow read: if isOffice(cid) || (inCompany(cid) && resource.data.uid == request.auth.uid);
+        allow write: if isOffice(cid);
+      }
+
+      // Historie změn a deník: jen přidávat, nikdy upravovat ani mazat.
+      match /audit/{id} {
+        allow read: if inCompany(cid);
+        allow create: if inCompany(cid) && request.resource.data.by == request.auth.uid;
+        allow update, delete: if false;
+      }
+
       match /materials/{materialId} {
         allow read: if inCompany(cid);
         allow write: if isOffice(cid);
