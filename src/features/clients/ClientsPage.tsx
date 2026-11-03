@@ -9,6 +9,7 @@ import { Drawer } from '@/components/ui/Drawer';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { Toast, type ToastMsg } from '@/components/ui/Toast';
 import { fmt } from '@/features/analytics/lib/metrics';
+import { priceLevelsOf } from '@/lib/finance';
 import { createFromRecurring, deleteRecurring, saveClient, saveRecurring, type Snapshot } from '@/lib/mock/localBackend';
 import { useSnapshot } from '@/lib/mock/useSnapshot';
 import { clientsView, type ClientView } from '@/lib/operations';
@@ -120,14 +121,15 @@ function Directory({ snap, say }: { snap: Snapshot; say: (t: string) => void }) 
 }
 
 function ClientDrawer({ client, snap, onClose, onSaved }: { client: ClientView | null; snap: Snapshot; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ phone: '', email: '', address: '', ico: '', note: '' });
+  const [f, setF] = useState({ phone: '', email: '', address: '', ico: '', note: '', priceLevelId: '' });
   useEffect(() => {
-    if (client) setF({ phone: client.phone, email: client.email, address: client.address, ico: client.ico, note: client.note });
+    if (client) setF({ phone: client.phone, email: client.email, address: client.address, ico: client.ico, note: client.note, priceLevelId: client.priceLevelId ?? '' });
   }, [client]);
+  const levels = priceLevelsOf(snap.settings);
   if (!client) return null;
   const jobs = client.jobIds.map((id) => snap.jobs.find((j) => j.id === id)).filter(Boolean) as Job[];
   const quotes = client.quoteIds.map((id) => snap.quotes.find((q) => q.id === id)).filter((q): q is NonNullable<typeof q> => Boolean(q));
-  const dirty = (Object.keys(f) as Array<keyof typeof f>).some((k) => f[k] !== client[k]);
+  const dirty = (Object.keys(f) as Array<keyof typeof f>).some((k) => f[k] !== (client[k] ?? ''));
 
   return (
     <Drawer
@@ -153,7 +155,7 @@ function ClientDrawer({ client, snap, onClose, onSaved }: { client: ClientView |
             type="button"
             disabled={!dirty}
             onClick={() => {
-              saveClient({ id: client.id, name: client.name, ...f });
+              saveClient({ id: client.id, name: client.name, ...f, priceLevelId: f.priceLevelId || null });
               onSaved();
             }}
             className={btnPrimary}
@@ -168,6 +170,14 @@ function ClientDrawer({ client, snap, onClose, onSaved }: { client: ClientView |
         <input aria-label="E-mail" placeholder="E-mail" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} className={inputCls} />
         <input aria-label="Adresa" placeholder="Adresa" value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} className={`${inputCls} col-span-2`} />
         <input aria-label="IČO" placeholder="IČO" value={f.ico} onChange={(e) => setF({ ...f, ico: e.target.value.replace(/\D/g, '') })} className={inputCls} />
+        <select aria-label="Cenová hladina" value={f.priceLevelId} onChange={(e) => setF({ ...f, priceLevelId: e.target.value })} className={inputCls}>
+          <option value="">Cenová hladina: běžná</option>
+          {levels.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name} {l.discountPct ? `(−${l.discountPct} %)` : ''}
+            </option>
+          ))}
+        </select>
         <textarea aria-label="Poznámka" placeholder="Poznámka, např. volat jen dopoledne, klíče u sousedky" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} rows={2} className="col-span-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-series-1 focus:outline-none" />
       </div>
       <h3 className="mt-6 mb-2 text-sm font-semibold text-ink">Zakázky</h3>

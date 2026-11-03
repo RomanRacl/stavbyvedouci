@@ -1,10 +1,11 @@
 'use client';
 
-import { Check, FileOutput, Plus, Printer, Trash2 } from 'lucide-react';
+import { BadgeCheck, Check, FileOutput, FileText, Plus, Printer, Receipt, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { fmt, jobFinancials } from '@/features/analytics/lib/metrics';
-import { addPayment, deletePayment, issueInvoice, setPaymentPaid, updateJob } from '@/lib/mock/localBackend';
+import { addPayment, deletePayment, issueInvoice, setInvoicePaid, setPaymentPaid, updateJob } from '@/lib/mock/localBackend';
+import { needsTaxDoc, toEur } from '@/lib/finance';
 import { invoiceBasis, jobVat, marginAfterOverhead, overheadRate, paymentSummary, VAT_MODES } from '@/lib/money';
 import type { CompanySettings, Job, VatMode } from '@/types/firestore';
 
@@ -18,6 +19,9 @@ export function JobMoneyTab({ job, settings, onToast }: { job: Job; settings: Co
   const f = jobFinancials(job);
   const oh = marginAfterOverhead(job, settings, f.forecastCost);
   const [form, setForm] = useState<{ label: string; amount: string; due: string } | null>(null);
+  const eur = job.currency === 'EUR' && job.eurRate ? job.eurRate : null;
+  const taxDoc = needsTaxDoc(mode);
+  const settlement = (issuedAt: Date) => Boolean(job.invoice && issuedAt.getTime() >= job.invoice.issuedAt.getTime() - 60_000);
 
   const openForm = (share?: number) =>
     setForm({
@@ -59,7 +63,47 @@ export function JobMoneyTab({ job, settings, onToast }: { job: Job; settings: Co
           <dd className="text-right text-good-ink tabular-nums">{fmt.czk(ps.paid)}</dd>
           <dt className="font-medium text-ink">Zbývá</dt>
           <dd className="text-right font-semibold tabular-nums">{fmt.czk(ps.remaining)}</dd>
+          {eur && (
+            <>
+              <dt className="text-ink-2">Celkem v EUR</dt>
+              <dd className="text-right tabular-nums">{toEur(b.gross, eur).toLocaleString('cs-CZ', { style: 'currency', currency: 'EUR' })}</dd>
+            </>
+          )}
         </dl>
+        <div className="flex flex-wrap items-end gap-2 sm:col-span-2">
+          <label className="text-xs text-ink-2">
+            Měna dokladů
+            <select
+              value={job.currency ?? 'CZK'}
+              disabled={Boolean(job.invoice)}
+              onChange={(e) => {
+                const currency = e.target.value as 'CZK' | 'EUR';
+                updateJob(job.id, { currency, eurRate: currency === 'EUR' ? job.eurRate ?? settings.eurRate ?? 25 : null });
+                onToast(currency === 'EUR' ? 'Doklady se přepočtou do EUR.' : 'Doklady v Kč.');
+              }}
+              className="mt-1 block h-9 rounded-md border border-line bg-surface px-2 text-sm"
+            >
+              <option value="CZK">Kč</option>
+              <option value="EUR">EUR (zahraniční zákazník)</option>
+            </select>
+          </label>
+          {job.currency === 'EUR' && (
+            <label className="text-xs text-ink-2">
+              Kurz Kč za 1 €
+              <input
+                inputMode="decimal"
+                defaultValue={String(job.eurRate ?? settings.eurRate ?? 25).replace('.', ',')}
+                disabled={Boolean(job.invoice)}
+                onBlur={(e) => {
+                  const v = Number(e.target.value.replace(',', '.'));
+                  if (v > 1) updateJob(job.id, { eurRate: v });
+                }}
+                className="mt-1 block h-9 w-24 rounded-md border border-line bg-surface px-2 text-right text-sm tabular-nums"
+              />
+            </label>
+          )}
+          {job.currency === 'EUR' && <p className="pb-2 text-xs text-ink-3">Účetnictví vedete v Kč, na podkladu bude i částka v EUR. Kurz ČNB ke dni plnění.</p>}
+        </div>
       </section>
 
       <section>
@@ -103,7 +147,7 @@ export function JobMoneyTab({ job, settings, onToast }: { job: Job; settings: Co
                 onClick={() => {
                   addPayment(job.id, { label: form.label.trim(), amount: Number(form.amount), dueDate: new Date(form.due) });
                   setForm(null);
-                  onToast('Záloha přidána. Zákazníkovi ji pošlete jako zálohovou fakturu z účetního programu.');
+                  onToast('Záloha přidána. Zálohovou fakturu s QR platbou vytisknete ikonou u zálohy.');
                 }}
                 className="h-9 rounded-md bg-ink px-3 text-sm font-semibold text-white disabled:bg-line disabled:text-ink-3"
               >
@@ -134,12 +178,37 @@ export function JobMoneyTab({ job, settings, onToast }: { job: Job; settings: Co
                     {p.paidAt && <Check className="size-3.5" strokeWidth={3} />}
                   </button>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-ink">{p.label}</span>
+                    <span className="block text-ink">
+                      {p.label}
+                      {p.number && <span className="ml-1.5 text-xs text-ink-3 tabular-nums">{p.number}</span>}
+                    </span>
                     <span className={`block text-xs ${overdue ? 'font-medium text-crit-ink' : 'text-ink-3'}`}>
                       {p.paidAt ? `zaplaceno ${p.paidAt.toLocaleDateString('cs-CZ')}` : `${overdue ? 'po splatnosti, ' : ''}splatné ${p.dueDate.toLocaleDateString('cs-CZ')}`}
                     </span>
                   </span>
                   <span className="font-semibold tabular-nums">{fmt.czk(p.amount)}</span>
+                  {!settlement(p.issuedAt) && (
+                    <button
+                      type="button"
+                      title="Zálohová faktura s QR platbou"
+                      aria-label="Tisk zálohové faktury"
+                      onClick={() => window.open(`/tisk/zaloha/${job.id}~${p.id}`, '_blank')}
+                      className="grid size-8 place-items-center rounded text-ink-2 hover:bg-concrete hover:text-ink"
+                    >
+                      <FileText className="size-4" />
+                    </button>
+                  )}
+                  {p.paidAt && !settlement(p.issuedAt) && (
+                    <button
+                      type="button"
+                      title={taxDoc ? `Daňový doklad k přijaté platbě ${p.taxDocNumber ?? ''}` : 'Potvrzení o přijetí platby'}
+                      aria-label="Tisk dokladu k přijaté platbě"
+                      onClick={() => window.open(`/tisk/doklad/${job.id}~${p.id}`, '_blank')}
+                      className="grid size-8 place-items-center rounded text-ink-2 hover:bg-concrete hover:text-ink"
+                    >
+                      <Receipt className="size-4" />
+                    </button>
+                  )}
                   {!p.paidAt && (
                     <button type="button" aria-label="Smazat zálohu" onClick={() => deletePayment(job.id, p.id)} className="grid size-8 place-items-center rounded text-ink-3 hover:bg-crit/10 hover:text-crit-ink">
                       <Trash2 className="size-3.5" />
@@ -158,7 +227,24 @@ export function JobMoneyTab({ job, settings, onToast }: { job: Job; settings: Co
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line p-3 text-sm">
             <span className="flex-1">
               Podklad <strong>{job.invoice.number}</strong> vystaven {job.invoice.issuedAt.toLocaleDateString('cs-CZ')}, splatnost {job.invoice.dueDate.toLocaleDateString('cs-CZ')}.
+              {job.invoice.paidAt ? (
+                <span className="ml-1 inline-flex items-center gap-1 font-medium text-good-ink">
+                  <BadgeCheck className="size-4" /> Uhrazeno {job.invoice.paidAt.toLocaleDateString('cs-CZ')}
+                </span>
+              ) : (
+                (job.invoice.reminders ?? []).length > 0 && <span className="ml-1 text-warn-ink">Odesláno upomínek: {job.invoice.reminders!.length}.</span>
+              )}
             </span>
+            <button
+              type="button"
+              onClick={() => {
+                setInvoicePaid(job.id, !job.invoice!.paidAt);
+                onToast(job.invoice!.paidAt ? 'Faktura vrácena mezi neuhrazené.' : 'Faktura označena jako uhrazená.');
+              }}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-line px-3 text-sm hover:border-ink-3"
+            >
+              <Check className="size-4" /> {job.invoice.paidAt ? 'Zrušit úhradu' : 'Zaplaceno'}
+            </button>
             <button type="button" onClick={() => window.open(`/tisk/podklad/${job.id}`, '_blank')} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-line px-3 text-sm hover:border-ink-3">
               <Printer className="size-4" /> Tisk / PDF
             </button>

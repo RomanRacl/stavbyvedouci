@@ -25,12 +25,16 @@ import {
   VAT_MODES,
 } from '@/lib/money';
 import type { Job } from '@/types/firestore';
+import { ReceivablesTab } from './ReceivablesTab';
+import { TaxTab } from './TaxTab';
 
 const TABS = [
   { id: 'invoice', label: 'Fakturace' },
+  { id: 'receivables', label: 'Pohledávky a upomínky' },
   { id: 'payments', label: 'Zálohy a platby' },
   { id: 'payroll', label: 'Mzdy' },
   { id: 'overhead', label: 'Režie' },
+  { id: 'taxes', label: 'Daně' },
 ] as const;
 type Tab = (typeof TABS)[number]['id'];
 
@@ -55,7 +59,7 @@ export default function MoneyPage() {
 
   return (
     <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
-      <PageHeader title="Peníze" description="Fakturace hotových zakázek, zálohy od zákazníků, podklady pro mzdy a rozpočítání režie." />
+      <PageHeader title="Peníze" description="Fakturace hotových zakázek, upomínky, zálohy od zákazníků, podklady pro mzdy, režie a odhad daní." />
       <LayoutGroup id="money-tabs">
         <div className="mb-5 flex gap-1 overflow-x-auto border-b border-line" role="tablist" aria-label="Části">
           {TABS.map((t) => (
@@ -67,9 +71,11 @@ export default function MoneyPage() {
         </div>
       </LayoutGroup>
       {tab === 'invoice' && <InvoiceTab snap={snap} say={say} />}
+      {tab === 'receivables' && <ReceivablesTab snap={snap} say={say} />}
       {tab === 'payments' && <PaymentsTab snap={snap} />}
       {tab === 'payroll' && <PayrollTab snap={snap} />}
       {tab === 'overhead' && <OverheadTab snap={snap} say={say} />}
+      {tab === 'taxes' && <TaxTab snap={snap} say={say} />}
       <Toast message={toast} onDone={clearToast} />
     </main>
   );

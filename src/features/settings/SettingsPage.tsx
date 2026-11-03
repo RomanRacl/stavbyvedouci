@@ -1,6 +1,6 @@
 'use client';
 
-import { ImagePlus, RotateCcw, Trash2 } from 'lucide-react';
+import { ImagePlus, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { btnPrimary, btnSecondary, inputCls, PageHeader } from '@/components/shell/PageHeader';
 import { Toast, type ToastMsg } from '@/components/ui/Toast';
@@ -8,6 +8,7 @@ import { saveSettings } from '@/lib/mock/localBackend';
 import { resetStore } from '@/lib/mock/localStore';
 import { useSnapshot } from '@/lib/mock/useSnapshot';
 import { VAT_MODES } from '@/lib/money';
+import { DEFAULT_REMINDER_DAYS, ibanFromAccount, priceLevelsOf } from '@/lib/finance';
 import type { CompanySettings, VatMode } from '@/types/firestore';
 
 /** Zmenší logo na max. 400 px a uloží jako PNG data URL (průhlednost zůstane). */
@@ -93,7 +94,11 @@ export default function SettingsPage() {
           <Field label="E-mail">
             <input type="email" value={f.email} onChange={(e) => set('email', e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Číslo účtu" wide hint="Zobrazí se na podkladu k fakturaci.">
+          <Field
+            label="Číslo účtu"
+            wide
+            hint={!f.bankAccount ? 'Zobrazí se na dokladech a vytvoří se z něj QR platba.' : ibanFromAccount(f.bankAccount) ? `IBAN ${ibanFromAccount(f.bankAccount)}, QR platba bude na dokladech.` : 'Nerozpoznaný formát, QR platba nebude. Zadejte např. 123456789/0100.'}
+          >
             <input value={f.bankAccount} onChange={(e) => set('bankAccount', e.target.value)} placeholder="123456789/0100" className={inputCls} />
           </Field>
           <div className="sm:col-span-2">
@@ -171,6 +176,79 @@ export default function SettingsPage() {
           </Field>
           <Field label="Platnost nabídek" hint="dní">
             <input inputMode="numeric" value={f.quoteValidityDays} onChange={(e) => set('quoteValidityDays', Number(e.target.value.replace(/\D/g, '')) || 0)} className={`${inputCls} text-right tabular-nums`} />
+          </Field>
+        </Section>
+
+        <Section title="Zákazníci a pohledávky" description="Slevy pro stálé zákazníky, délka záruky na dílo a kdy připomínat neuhrazené faktury.">
+          <div className="sm:col-span-2">
+            <span className="text-sm font-medium text-ink">Cenové hladiny</span>
+            <ul className="mt-1 space-y-2">
+              {priceLevelsOf(f).map((l, idx) => (
+                <li key={l.id} className="flex items-center gap-2">
+                  <input
+                    aria-label="Název hladiny"
+                    value={l.name}
+                    onChange={(e) => set('priceLevels', priceLevelsOf(f).map((x, i) => (i === idx ? { ...x, name: e.target.value } : x)))}
+                    className={`${inputCls} flex-1`}
+                  />
+                  <input
+                    aria-label="Sleva v procentech"
+                    inputMode="numeric"
+                    value={l.discountPct}
+                    onChange={(e) => set('priceLevels', priceLevelsOf(f).map((x, i) => (i === idx ? { ...x, discountPct: Math.min(50, Number(e.target.value.replace(/\D/g, '')) || 0) } : x)))}
+                    className={`${inputCls} w-20 text-right tabular-nums`}
+                  />
+                  <span className="text-sm text-ink-3">%</span>
+                  <button
+                    type="button"
+                    aria-label={`Odebrat ${l.name}`}
+                    onClick={() => set('priceLevels', priceLevelsOf(f).filter((_, i) => i !== idx))}
+                    className="grid size-10 place-items-center rounded-lg text-ink-3 hover:bg-crit/10 hover:text-crit-ink"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button type="button" onClick={() => set('priceLevels', [...priceLevelsOf(f), { id: `pl_${Date.now().toString(36)}`, name: 'Nová hladina', discountPct: 0 }])} className={`${btnSecondary} mt-2`}>
+              <Plus className="size-4" /> Přidat hladinu
+            </button>
+            <p className="mt-1 text-xs text-ink-3">Hladinu přiřadíte zákazníkovi v adresáři. V nabídce se sleva doplní sama.</p>
+          </div>
+          <Field label="Záruka na dílo" hint="měsíců od předání">
+            <input inputMode="numeric" value={f.warrantyMonths ?? 24} onChange={(e) => set('warrantyMonths', Number(e.target.value.replace(/\D/g, '')) || 0)} className={`${inputCls} text-right tabular-nums`} />
+          </Field>
+          <Field label="Kurz EUR pro nové nabídky" hint="Kč za 1 €">
+            <input
+              inputMode="decimal"
+              value={String(f.eurRate ?? 25).replace('.', ',')}
+              onChange={(e) => set('eurRate', Number(e.target.value.replace(',', '.').replace(/[^\d.]/g, '')) || 0)}
+              className={`${inputCls} text-right tabular-nums`}
+            />
+          </Field>
+          <Field label="Upomínky po splatnosti" hint="1., 2. a 3. upomínka, dní po splatnosti" wide>
+            <div className="flex gap-2">
+              {[0, 1, 2].map((i) => (
+                <input
+                  key={i}
+                  aria-label={`${i + 1}. upomínka po dnech`}
+                  inputMode="numeric"
+                  value={(f.reminderDays ?? DEFAULT_REMINDER_DAYS)[i]}
+                  onChange={(e) => {
+                    const next = [...(f.reminderDays ?? DEFAULT_REMINDER_DAYS)] as [number, number, number];
+                    next[i] = Number(e.target.value.replace(/\D/g, '')) || 0;
+                    set('reminderDays', next);
+                  }}
+                  className={`${inputCls} w-20 text-right tabular-nums`}
+                />
+              ))}
+            </div>
+          </Field>
+          <Field label="Právní forma" hint="pro odhad daní v Peníze → Daně" wide>
+            <select value={f.legalForm ?? 'sro'} onChange={(e) => set('legalForm', e.target.value as 'sro' | 'osvc')} className={inputCls}>
+              <option value="sro">Společnost s ručením omezeným (s.r.o.)</option>
+              <option value="osvc">Živnostník (OSVČ)</option>
+            </select>
           </Field>
         </Section>
 

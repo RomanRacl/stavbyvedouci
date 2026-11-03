@@ -2,7 +2,9 @@
 
 import { DocumentShell, VatSummary } from '@/components/print/DocumentShell';
 import { useSnapshot } from '@/lib/mock/useSnapshot';
+import { fmtMoney, toEur } from '@/lib/finance';
 import { invoiceBasis, VAT_MODES } from '@/lib/money';
+import { QrPayment } from './QrPayment';
 
 const czk = (n: number) => n.toLocaleString('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 2 });
 
@@ -17,6 +19,7 @@ export default function InvoicePrint({ jobId }: { jobId: string }) {
   if (!job) return <p className="p-10 text-center text-ink-2">Zakázka nebyla nalezena.</p>;
   const b = invoiceBasis(job, snap.settings);
   const inv = job.invoice;
+  const eur = job.currency === 'EUR' && job.eurRate ? job.eurRate : null;
   const paid = (job.payments ?? []).filter((p) => p.paidAt);
   const logs = snap.timeLogs.filter((l) => l.jobId === job.id && l.endedAt);
   const byWorker = snap.members
@@ -85,10 +88,22 @@ export default function InvoicePrint({ jobId }: { jobId: string }) {
               <td className="pt-1 pr-4 font-bold">Zbývá uhradit</td>
               <td className="pt-1 text-base font-bold tabular-nums">{czk(b.toPay)}</td>
             </tr>
+            {eur && (
+              <tr>
+                <td className="pt-1 pr-4 text-ink-2">V EUR (kurz {eur.toLocaleString('cs-CZ')} Kč/€)</td>
+                <td className="pt-1 font-semibold tabular-nums">{fmtMoney(toEur(b.toPay, eur), 'EUR')}</td>
+              </tr>
+            )}
           </>
         }
       />
       {b.note && <p className="mt-2 text-right text-xs font-semibold">{b.note}</p>}
+
+      {inv?.paidAt ? (
+        <p className="mt-6 inline-block rotate-[-2deg] rounded border-2 border-good px-3 py-1 text-sm font-bold text-good-ink">UHRAZENO {inv.paidAt.toLocaleDateString('cs-CZ')}</p>
+      ) : (
+        b.toPay > 0 && !eur && <QrPayment settings={snap.settings} amount={b.toPay} docNumber={inv?.number ?? job.code} due={inv?.dueDate} message={`Faktura ${inv?.number ?? job.code}`} />
+      )}
 
       {(byWorker.length > 0 || job.materialPlan.some((l) => l.usedQty > 0)) && (
         <section className="mt-10 break-inside-avoid">
