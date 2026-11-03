@@ -8,6 +8,7 @@ import { checklistOf, extraWorkOf, suggestExtraPrice } from '@/lib/jobDefaults';
 import type { ChecklistItem, CompanySettings, ExtraWork, Job, Member, TimeLog } from '@/types/firestore';
 import { RevisionsSection, SafetySection, StagesSection } from './JobOpsSections';
 import { WarrantySection } from './WarrantySection';
+import { ReservationsSection } from './ReservationsSection';
 
 export type ExtraDecision = { approve: true; price: number } | { approve: false };
 
@@ -190,6 +191,8 @@ export function JobProgressTab({ job, members, settings, timeLogs, onToast, onDe
         </h3>
         <ChecklistEditor job={job} members={members} onSave={onSetChecklist} />
       </section>
+
+      <ReservationsSection job={job} />
 
       <RevisionsSection job={job} onToast={onToast} />
 

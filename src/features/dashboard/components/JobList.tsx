@@ -1,7 +1,9 @@
 'use client';
 
-import { LayoutGroup, motion } from 'framer-motion';
-import { Search, TrendingDown, Wrench } from 'lucide-react';
+import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
+import { Check, ListChecks, Search, TrendingDown, Wrench, X } from 'lucide-react';
+import { bulkAssign, bulkDelete, bulkShift, bulkStatus } from '@/lib/mock/localBackend';
+import { useSnapshot } from '@/lib/mock/useSnapshot';
 import { useMemo, useState } from 'react';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { fmt, jobFinancials } from '@/features/analytics/lib/metrics';
@@ -31,11 +33,31 @@ interface Props {
   jobs: Job[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Hlášení výsledku hromadné akce. */
+  onToast?: (text: string) => void;
 }
 
-export function JobList({ jobs, selectedId, onSelect }: Props) {
+export function JobList({ jobs, selectedId, onSelect, onToast }: Props) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]['id']>('all');
   const [q, setQ] = useState('');
+  const [bulk, setBulk] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [confirmDel, setConfirmDel] = useState(false);
+  const snap = useSnapshot();
+  const workers = (snap?.members ?? []).filter((m) => m.role !== 'owner');
+  const toggle = (id: string) =>
+    setPicked((p) => {
+      const n = new Set(p);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const ids = [...picked];
+  const done = (text: string) => {
+    onToast?.(text);
+    setPicked(new Set());
+    setConfirmDel(false);
+  };
 
   const counts = useMemo(() => {
     // „Aktivní“ = vše kromě vyfakturovaných, které jsou v Archivu.
@@ -66,8 +88,21 @@ export function JobList({ jobs, selectedId, onSelect }: Props) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Hledat podle kódu, klienta nebo adresy"
-            className="h-10 w-full rounded-lg border border-line bg-concrete/50 pr-3 pl-9 text-sm text-ink placeholder:text-ink-3 transition focus:border-series-1 focus:bg-surface focus:outline-none"
+            className="h-10 w-full rounded-lg border border-line bg-concrete/50 pr-12 pl-9 text-sm text-ink placeholder:text-ink-3 transition focus:border-series-1 focus:bg-surface focus:outline-none"
           />
+          <button
+            type="button"
+            onClick={() => {
+              setBulk((b) => !b);
+              setPicked(new Set());
+            }}
+            aria-pressed={bulk}
+            title="Vybrat více zakázek a upravit je najednou"
+            aria-label="Hromadný výběr"
+            className={`absolute top-1/2 right-1 grid size-8 -translate-y-1/2 place-items-center rounded-md ${bulk ? 'bg-ink text-white' : 'text-ink-2 hover:bg-concrete hover:text-ink'}`}
+          >
+            <ListChecks className="size-4" />
+          </button>
         </label>
         <LayoutGroup id="job-filters">
           <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Filtr stavu">
@@ -115,11 +150,13 @@ export function JobList({ jobs, selectedId, onSelect }: Props) {
               <motion.li key={job.id} layout="position" transition={{ duration: 0.25 }}>
                 <button
                   type="button"
-                  onClick={() => onSelect(job.id)}
-                  aria-current={selected ? 'true' : undefined}
+                  onClick={() => (bulk ? toggle(job.id) : onSelect(job.id))}
+                  aria-current={selected && !bulk ? 'true' : undefined}
+                  aria-pressed={bulk ? picked.has(job.id) : undefined}
                   className="group relative w-full rounded-lg px-3 py-3 text-left focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:outline-none"
                 >
-                  {selected && (
+                  {bulk && picked.has(job.id) && <span className="absolute inset-0 rounded-lg bg-series-1/10" />}
+                  {selected && !bulk && (
                     <motion.span
                       layoutId="row-selection"
                       className="absolute inset-0 rounded-lg bg-concrete"
@@ -129,6 +166,11 @@ export function JobList({ jobs, selectedId, onSelect }: Props) {
                     </motion.span>
                   )}
                   <span className="relative flex items-start gap-3">
+                    {bulk && (
+                      <span className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded border-2 ${picked.has(job.id) ? 'border-ink bg-ink text-white' : 'border-line'}`} aria-hidden>
+                        {picked.has(job.id) && <Check className="size-3" strokeWidth={3} />}
+                      </span>
+                    )}
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
                         <span className="font-display text-sm font-semibold text-ink-2 tabular-nums">{job.code}</span>
@@ -171,6 +213,89 @@ export function JobList({ jobs, selectedId, onSelect }: Props) {
           })}
         </ul>
       </LayoutGroup>
+      <AnimatePresence>
+        {bulk && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t border-line bg-concrete/60">
+            <div className="flex flex-wrap items-center gap-2 p-3 text-sm">
+              <span className="font-medium text-ink tabular-nums">Vybráno {picked.size}</span>
+              <button type="button" onClick={() => setPicked(new Set(visible.map((j) => j.id)))} className="text-series-1-ink underline-offset-4 hover:underline">
+                vše ({visible.length})
+              </button>
+              <span className="flex-1" />
+              <button type="button" aria-label="Ukončit výběr" onClick={() => setBulk(false)} className="grid size-8 place-items-center rounded-md text-ink-2 hover:bg-surface">
+                <X className="size-4" />
+              </button>
+              <div className="flex w-full flex-wrap gap-2">
+                <select
+                  aria-label="Posunout termín"
+                  disabled={!picked.size}
+                  value=""
+                  onChange={(e) => {
+                    const d = Number(e.target.value);
+                    if (!d) return;
+                    bulkShift(ids, d);
+                    done(`${ids.length} zakázek posunuto o ${d > 0 ? '+' : ''}${d} dní.`);
+                  }}
+                  className="h-9 rounded-md border border-line bg-surface px-2 text-sm disabled:opacity-50"
+                >
+                  <option value="">Posunout termín…</option>
+                  {[-7, -1, 1, 2, 3, 7, 14].map((d) => (
+                    <option key={d} value={d}>
+                      {d > 0 ? '+' : ''}
+                      {d} {Math.abs(d) === 1 ? 'den' : 'dní'}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Přidat pracovníka"
+                  disabled={!picked.size}
+                  value=""
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    bulkAssign(ids, e.target.value, 'add');
+                    done(`${workers.find((w) => w.uid === e.target.value)?.displayName} přidán na ${ids.length} zakázek.`);
+                  }}
+                  className="h-9 rounded-md border border-line bg-surface px-2 text-sm disabled:opacity-50"
+                >
+                  <option value="">Přidat člověka…</option>
+                  {workers.map((w) => (
+                    <option key={w.uid} value={w.uid}>
+                      {w.displayName}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!picked.size}
+                  onClick={() => {
+                    const n = bulkStatus(ids, 'approved');
+                    done(n ? `Schváleno ${n} zakázek.` : 'Žádná z vybraných nečekala na schválení.');
+                  }}
+                  className="h-9 rounded-md border border-line bg-surface px-3 text-sm font-medium text-ink hover:border-ink-3 disabled:opacity-50"
+                >
+                  Schválit
+                </button>
+                {confirmDel ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      bulkDelete(ids);
+                      done(`Smazáno ${ids.length} zakázek.`);
+                    }}
+                    className="h-9 rounded-md bg-crit px-3 text-sm font-semibold text-white"
+                  >
+                    Opravdu smazat {picked.size}?
+                  </button>
+                ) : (
+                  <button type="button" disabled={!picked.size} onClick={() => setConfirmDel(true)} className="h-9 rounded-md px-3 text-sm text-ink-2 hover:bg-crit/10 hover:text-crit-ink disabled:opacity-50">
+                    Smazat
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }

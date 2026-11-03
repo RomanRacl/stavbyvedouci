@@ -21,11 +21,16 @@ export interface JobFinancials {
 export function jobFinancials(job: Job): JobFinancials {
   const { budget, actuals } = job;
   const progress = Math.max(job.progressPct, 0) / 100;
-  const costToDate = actuals.laborCost + actuals.materialCost;
+  const own = actuals.laborCost + actuals.materialCost;
+  const subs = job.subcontracts ?? [];
+  const subTotal = subs.reduce((a, x) => a + x.price, 0);
+  const subDone = subs.filter((x) => x.status !== 'ordered').reduce((a, x) => a + x.price, 0);
+  const costToDate = own + subDone;
   const budgetCost = budget.laborCost + budget.materialCost;
 
   // Pod 10 % dokončenosti je extrapolace šum -> držíme se rozpočtu.
-  const forecastCost = progress >= 0.1 ? Math.round(costToDate / progress) : Math.max(budgetCost, costToDate);
+  // Subdodávky mají pevnou cenu, proto se k odhadu přičítají celé, ne extrapolují.
+  const forecastCost = (progress >= 0.1 ? Math.round(own / progress) : Math.max(budgetCost, own)) + subTotal;
   const forecastMargin = budget.revenue - forecastCost;
 
   return {

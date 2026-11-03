@@ -12,6 +12,7 @@ import { useSnapshot } from '@/lib/mock/useSnapshot';
 import { TRADE_LABEL } from '@/lib/trades';
 import type { JobTemplate } from '@/types/firestore';
 import { TemplateDrawer } from './TemplateDrawer';
+import { MessageTemplates } from './MessageTemplates';
 
 /** Šablony zakázek – opakované typy prací s předpřipraveným materiálem a kontrolním seznamem. */
 export default function TemplatesPage() {
@@ -134,6 +135,8 @@ export default function TemplatesPage() {
           })}
         </ul>
       )}
+
+      <MessageTemplates snap={snap} say={say} />
 
       <TemplateDrawer
         open={open}

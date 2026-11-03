@@ -6,6 +6,7 @@ import { InfoTip } from '@/components/ui/InfoTip';
 import { fmt, jobFinancials } from '@/features/analytics/lib/metrics';
 import { addPayment, deletePayment, issueInvoice, setInvoicePaid, setPaymentPaid, updateJob } from '@/lib/mock/localBackend';
 import { needsTaxDoc, toEur } from '@/lib/finance';
+import { SubcontractsSection } from './SubcontractsSection';
 import { invoiceBasis, jobVat, marginAfterOverhead, overheadRate, paymentSummary, VAT_MODES } from '@/lib/money';
 import type { CompanySettings, Job, VatMode } from '@/types/firestore';
 
@@ -265,6 +266,8 @@ export function JobMoneyTab({ job, settings, onToast }: { job: Job; settings: Co
           <p className="text-sm text-ink-2">Podklad půjde vystavit, až zakázku schválíte.</p>
         )}
       </section>
+
+      <SubcontractsSection job={job} onToast={onToast} />
 
       <section className="rounded-lg bg-concrete/60 p-4">
         <h3 className="flex items-center gap-1 text-sm font-semibold text-ink">

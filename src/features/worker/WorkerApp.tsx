@@ -39,6 +39,7 @@ import { MaterialSheet } from './components/MaterialSheet';
 import { TimerButton } from './components/TimerButton';
 import { WorkerJobView } from './components/WorkerJobView';
 import { WorkerPicker } from './components/WorkerPicker';
+import { MoreSheets, MoreTiles, type MoreKind } from './components/MoreSheets';
 import { buzz, useCurrentWorker, useWorkerData } from './hooks/useWorkerData';
 
 const ACTIVE = new Set<Job['status']>(['scheduled', 'in_progress']);
@@ -98,6 +99,7 @@ export default function WorkerApp() {
   const say = (text: string, tone: ToastMsg['tone'] = 'success') => setToast({ text, tone, id: Date.now() });
   const [materialOpen, setMaterialOpen] = useState(false);
   const [dayOpen, setDayOpen] = useState(false);
+  const [more, setMore] = useState<MoreKind | null>(null);
   const [safetyFor, setSafetyFor] = useState<{ job: Job; stageId: string | null } | null>(null);
   const [gloves, toggleGloves] = useGloves();
 
@@ -262,6 +264,11 @@ export default function WorkerApp() {
           </section>
         )}
 
+        <MoreTiles
+          onOpen={setMore}
+          badge={{ absence: snap.absences.filter((a) => a.uid === me.uid && a.status === 'pending').length }}
+        />
+
         <button type="button" onClick={() => setUid(null)} className="mx-auto mt-10 block h-11 rounded-xl px-4 text-sm font-medium text-ink-3 active:bg-surface">
           Nejsem {me.displayName.split(' ')[0]}, přepnout
         </button>
@@ -351,6 +358,8 @@ export default function WorkerApp() {
           start(job, stageId, true);
         }}
       />
+
+      <MoreSheets open={more} onClose={() => setMore(null)} snap={snap} me={me} say={say} />
 
       <DayReportSheet
         open={dayOpen}

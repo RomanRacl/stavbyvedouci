@@ -1,6 +1,8 @@
 'use client';
 
-import { ImagePlus, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { FileSpreadsheet, ImagePlus, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { ImportDataDrawer } from './ImportDataDrawer';
+import type { ImportKind } from '@/lib/import/dataImport';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { btnPrimary, btnSecondary, inputCls, PageHeader } from '@/components/shell/PageHeader';
 import { Toast, type ToastMsg } from '@/components/ui/Toast';
@@ -51,6 +53,7 @@ export default function SettingsPage() {
   const [f, setF] = useState<CompanySettings | null>(null);
   const [toast, setToast] = useState<ToastMsg | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [importing, setImporting] = useState<ImportKind | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -252,6 +255,20 @@ export default function SettingsPage() {
           </Field>
         </Section>
 
+        <Section title="Lidé a provoz" description="Odměny party za zakázky hotové pod rozpočtem a sazba za kilometr v knize jízd.">
+          <Field label="Odměna z ušetřené práce" hint="% z ušetřených nákladů, dělí se podle hodin">
+            <input inputMode="numeric" value={f.bonusSharePct ?? 20} onChange={(e) => set('bonusSharePct', Math.min(100, Number(e.target.value.replace(/\D/g, '')) || 0))} className={`${inputCls} text-right tabular-nums`} />
+          </Field>
+          <Field label="Sazba za kilometr" hint="Kč/km, náklad dopravy na zakázky">
+            <input
+              inputMode="decimal"
+              value={String(f.kmRate ?? 5.8).replace('.', ',')}
+              onChange={(e) => set('kmRate', Number(e.target.value.replace(',', '.').replace(/[^\d.]/g, '')) || 0)}
+              className={`${inputCls} text-right tabular-nums`}
+            />
+          </Field>
+        </Section>
+
         <div className="sticky bottom-0 -mx-5 flex justify-end gap-2 border-t border-line bg-surface/95 px-5 py-3 backdrop-blur">
           <button type="button" disabled={!dirty} onClick={() => setF(snap.settings)} className={btnSecondary}>
             Zahodit změny
@@ -261,6 +278,20 @@ export default function SettingsPage() {
           </button>
         </div>
       </form>
+
+      <section className="mt-8 rounded-xl border border-line bg-surface p-5">
+        <h2 className="text-base font-semibold text-ink">Import z Excelu</h2>
+        <p className="mt-1 text-sm text-ink-2">Přecházíte z tabulek? Nahrajte seznam zakázek nebo zákazníků. Aplikace sama pozná sloupce a ukáže náhled.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={() => setImporting('jobs')} className={btnSecondary}>
+            <FileSpreadsheet className="size-4" /> Zakázky
+          </button>
+          <button type="button" onClick={() => setImporting('clients')} className={btnSecondary}>
+            <FileSpreadsheet className="size-4" /> Zákazníci
+          </button>
+        </div>
+      </section>
+      <ImportDataDrawer kind={importing} snap={snap} onClose={() => setImporting(null)} onDone={(t) => { setImporting(null); setToast({ text: t, tone: 'success', id: Date.now() }); }} />
 
       <section className="mt-8 rounded-xl border border-crit/30 bg-surface p-5">
         <h2 className="text-base font-semibold text-ink">Ukázková data</h2>

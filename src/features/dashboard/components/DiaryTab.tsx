@@ -1,13 +1,14 @@
 'use client';
 
 import { LayoutGroup, motion } from 'framer-motion';
-import { Printer } from 'lucide-react';
+import { Printer, Sparkles } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { DictateButton } from '@/components/ui/DictateButton';
 import { fmt } from '@/features/analytics/lib/metrics';
 import { AUDIT_LABEL } from '@/lib/audit';
-import { buildDiary } from '@/lib/diary';
+import { buildDiary, suggestDiaryText } from '@/lib/diary';
 import { addDiaryEntry } from '@/lib/mock/localBackend';
+import { dayKey } from '@/lib/jobDefaults';
 import type { AuditEntry, AuditKind, Job, JobNote, JobPhoto, MaterialItem, Member, MaterialUsage, TimeLog } from '@/types/firestore';
 
 interface Props {
@@ -66,12 +67,20 @@ export function DiaryTab(p: Props) {
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                rows={2}
+                rows={text.includes('\n') ? 6 : 2}
                 placeholder="např. Počasí: déšť, práce jen uvnitř. Předán klíč od sklepa."
                 className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm font-normal text-ink focus:border-series-1 focus:outline-none"
               />
             </label>
             <DictateButton size="desktop" onText={(t) => setText((c) => (c ? `${c} ${t}` : t))} />
+            <button
+              type="button"
+              title="Navrhne zápis z dnešní docházky, materiálu, fotek a etap"
+              onClick={() => setText(suggestDiaryText(p.job, days, dayKey(new Date())))}
+              className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-line px-3 text-sm text-ink-2 hover:text-ink"
+            >
+              <Sparkles className="size-4" /> Navrhnout za dnešek
+            </button>
             <button
               type="button"
               disabled={!text.trim()}

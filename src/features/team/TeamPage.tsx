@@ -8,6 +8,7 @@ import { Toast, type ToastMsg } from '@/components/ui/Toast';
 import { fmt } from '@/features/analytics/lib/metrics';
 import { deleteCertificate, saveCertificate, type Snapshot } from '@/lib/mock/localBackend';
 import { useSnapshot } from '@/lib/mock/useSnapshot';
+import { BonusSection } from './BonusSection';
 import { CERT_KINDS, certStatus, needsSafety, type CertStatus } from '@/lib/operations';
 import type { CertKind, Certificate, Member } from '@/types/firestore';
 
@@ -86,6 +87,7 @@ export default function TeamPage() {
           <PersonCard key={m.uid} member={m} snap={snap} onSaved={(t) => setToast({ text: t, tone: 'success', id: Date.now() })} />
         ))}
       </ul>
+      <BonusSection snap={snap} />
       <Toast message={toast} onDone={clearToast} />
     </main>
   );

@@ -11,6 +11,8 @@ import { useSnapshot } from '@/lib/mock/useSnapshot';
 import { assignmentIssue } from '@/lib/operations';
 import { TRADE_LABEL } from '@/lib/trades';
 import type { Job } from '@/types/firestore';
+import { ABSENCE_KINDS, absentOn } from '@/lib/people';
+import { GanttView } from './GanttView';
 
 const DAY = 86_400_000;
 const DAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
@@ -36,6 +38,7 @@ export default function CalendarPage() {
   const router = useRouter();
   const [week, setWeek] = useState(() => mondayOf(new Date()));
   const [withSaturday, setWithSaturday] = useState(false);
+  const [view, setView] = useState<'week' | 'gantt'>('week');
   const [over, setOver] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastMsg | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
@@ -88,6 +91,20 @@ export default function CalendarPage() {
         description="Kdo je kde tento týden. Zakázku přetáhněte na jiného člověka nebo jiný den; termín se posune celý."
         actions={
           <>
+            <div className="flex rounded-lg border border-line bg-surface p-0.5" role="radiogroup" aria-label="Zobrazení">
+              {(
+                [
+                  ['week', 'Týden'],
+                  ['gantt', 'Gantt'],
+                ] as const
+              ).map(([id, label]) => (
+                <button key={id} type="button" role="radio" aria-checked={view === id} onClick={() => setView(id)} className={`h-9 rounded-md px-3 text-sm ${view === id ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {view === 'week' && (
+            <>
             <div className="flex items-center rounded-lg border border-line bg-surface">
               <button type="button" aria-label="Předchozí týden" onClick={() => setWeek(new Date(week.getTime() - 7 * DAY))} className="grid size-10 place-items-center text-ink-2 hover:text-ink">
                 <ChevronLeft className="size-4" />
@@ -103,10 +120,16 @@ export default function CalendarPage() {
               <input type="checkbox" checked={withSaturday} onChange={(e) => setWithSaturday(e.target.checked)} className="size-4 accent-ink" />
               Sobota
             </label>
+            </>
+            )}
           </>
         }
       />
 
+      {view === 'gantt' ? (
+        <GanttView snap={snap} />
+      ) : (
+      <>
       {conflicts > 0 && (
         <p className="mb-4 flex items-center gap-2 rounded-xl border border-warn/40 bg-warn/8 px-4 py-3 text-sm text-ink">
           <AlertTriangle className="size-4 text-warn-ink" /> Tento týden je {conflicts}× dvojí obsazení: jeden člověk má ve stejný den víc zakázek.
@@ -146,6 +169,7 @@ export default function CalendarPage() {
                   {days.map((d) => {
                     const list = cell(w.uid, d);
                     const key = `${w.uid}_${d.getTime()}`;
+                    const away = absentOn(snap.absences, w.uid, d);
                     const clash = list.length > 1;
                     return (
                       <td
@@ -156,9 +180,15 @@ export default function CalendarPage() {
                         }}
                         onDragLeave={() => setOver((o) => (o === key ? null : o))}
                         onDrop={(e) => onDrop(e, w.uid, d)}
-                        className={`h-20 border-l border-line px-1.5 py-1.5 align-top transition-colors ${over === key ? 'bg-series-1/10' : clash ? 'bg-warn/8' : d.getTime() === today ? 'bg-concrete/50' : ''}`}
+                        className={`h-20 border-l border-line px-1.5 py-1.5 align-top transition-colors ${over === key ? 'bg-series-1/10' : clash || (away && list.length) ? 'bg-warn/8' : d.getTime() === today ? 'bg-concrete/50' : ''}`}
                       >
                         <div className="space-y-1">
+                          {away && (
+                            <span className={`block rounded-md px-1.5 py-0.5 text-xs font-medium ${ABSENCE_KINDS[away.kind].cls}`}>
+                              {ABSENCE_KINDS[away.kind].label}
+                              {away.status === 'pending' && ' (žádost)'}
+                            </span>
+                          )}
                           {list.map((j) => {
                             const issue = assignmentIssue(snap.certificates, w.uid, j.trade);
                             return (
@@ -239,6 +269,8 @@ export default function CalendarPage() {
           </section>
         </aside>
       </div>
+      </>
+      )}
       <Toast message={toast} onDone={clearToast} />
     </main>
   );

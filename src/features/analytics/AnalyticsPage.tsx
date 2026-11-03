@@ -13,6 +13,8 @@ import { saveSettings } from '@/lib/mock/localBackend';
 import { useSnapshot } from '@/lib/mock/useSnapshot';
 import { ChartCard } from './components/ChartCard';
 import { CapacityChart, CashflowChart, TradeChart } from './components/Charts';
+import { ClientProfitCard, GoalsCard, WhatIfCard, WorkerTrendCard } from './InsightsCards';
+import { monthKey, monthLabel } from '@/lib/money';
 
 const PERIODS = [3, 6, 12] as const;
 
@@ -64,6 +66,24 @@ export default function AnalyticsPage() {
             <button type="button" onClick={() => setSummaryOpen(true)} className={`${btnSecondary} print:hidden`}>
               <Newspaper className="size-4" /> Týdenní souhrn
             </button>
+            <select
+              aria-label="Měsíční report"
+              value=""
+              onChange={(e) => e.target.value && window.open(`/tisk/report/${e.target.value}`, '_blank')}
+              className="h-10 rounded-lg border border-line bg-surface px-3 text-sm print:hidden"
+            >
+              <option value="">Měsíční report…</option>
+              {Array.from({ length: 6 }, (_, i) => {
+                const d = new Date();
+                d.setDate(1);
+                d.setMonth(d.getMonth() - i);
+                return monthKey(d);
+              }).map((m) => (
+                <option key={m} value={m}>
+                  {monthLabel(m)}
+                </option>
+              ))}
+            </select>
             <button type="button" onClick={() => window.print()} className={`${btnSecondary} print:hidden`}>
               <Printer className="size-4" /> Tisk / PDF
             </button>
@@ -88,6 +108,7 @@ export default function AnalyticsPage() {
       </section>
 
       <div className="space-y-5">
+        <GoalsCard snap={snap} />
         <AlertsCard alerts={a.alerts} />
 
         <div className="grid gap-5 xl:grid-cols-2">
@@ -98,6 +119,11 @@ export default function AnalyticsPage() {
         <PeopleCard crews={a.crews} workers={a.workers} months={months} />
 
         <div className="grid gap-5 xl:grid-cols-2">
+          <ClientProfitCard done={a.done} snap={snap} months={months} />
+          <WorkerTrendCard snap={snap} />
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-2">
           <CashflowChart
             weeks={a.cash}
             startBalance={snap.settings.cashBalance ?? 0}
@@ -105,6 +131,8 @@ export default function AnalyticsPage() {
           />
           <CapacityChart weeks={a.cap} />
         </div>
+
+        <WhatIfCard snap={snap} />
       </div>
 
       <SummaryDrawer open={summaryOpen} onClose={() => setSummaryOpen(false)} text={weeklySummary(snap)} email={snap.settings.email} onCopied={() => setToast({ text: 'Souhrn zkopírován.', tone: 'success', id: Date.now() })} />

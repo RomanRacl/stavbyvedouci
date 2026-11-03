@@ -1,7 +1,9 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlertTriangle, ArrowLeft, Check, LayoutTemplate, ListPlus, Loader2, MapPin, Package, Pencil, Phone, ShoppingCart, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, LayoutTemplate, ListPlus, Loader2, MapPin, MessageSquareText, Package, Pencil, Phone, ShoppingCart, Trash2 } from 'lucide-react';
+import { MessageDrawer } from './MessageDrawer';
+import { lossCauses } from '@/lib/analytics';
 import { useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Accordion, AccordionItem } from '@/components/ui/Accordion';
@@ -134,6 +136,8 @@ export function JobDetail({
 
   const [tab, setTab] = useState<'overview' | 'progress' | 'money' | 'photos' | 'notes' | 'diary'>('overview');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [msgOpen, setMsgOpen] = useState(false);
+  const causes = useMemo(() => lossCauses(job), [job]);
   const [tplName, setTplName] = useState<string | null>(null);
   const pendingExtras = extraWorkOf(job).filter((e) => e.status === 'pending').length;
   const checklist = checklistOf(job);
@@ -223,6 +227,15 @@ export function JobDetail({
                 <LayoutTemplate className="size-4" />
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setMsgOpen(true)}
+              aria-label="Zpráva zákazníkovi"
+              title="Zpráva zákazníkovi ze šablony"
+              className="grid size-10 place-items-center rounded-lg text-ink-2 transition hover:bg-concrete hover:text-ink focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:outline-none"
+            >
+              <MessageSquareText className="size-4" />
+            </button>
             <button
               type="button"
               onClick={onEdit}
@@ -324,14 +337,32 @@ export function JobDetail({
         {tab === 'overview' && (
         <>
         {alerts.length > 0 && (
-          <ul className={`space-y-1 rounded-lg border p-3 text-sm ${alerts.some((x) => x.level === 'critical') ? 'border-crit/40 bg-crit/5' : 'border-warn/40 bg-warn/5'}`}>
-            {alerts.map((x) => (
-              <li key={x.code} className="flex items-start gap-2 text-ink">
-                <AlertTriangle className={`mt-0.5 size-4 shrink-0 ${x.level === 'critical' ? 'text-crit-ink' : 'text-warn-ink'}`} aria-hidden />
-                {x.text}
-              </li>
-            ))}
-          </ul>
+          <div className={`rounded-lg border p-3 text-sm ${alerts.some((x) => x.level === 'critical') ? 'border-crit/40 bg-crit/5' : 'border-warn/40 bg-warn/5'}`}>
+            <ul className="space-y-1">
+              {alerts.map((x) => (
+                <li key={x.code} className="flex items-start gap-2 text-ink">
+                  <AlertTriangle className={`mt-0.5 size-4 shrink-0 ${x.level === 'critical' ? 'text-crit-ink' : 'text-warn-ink'}`} aria-hidden />
+                  {x.text}
+                </li>
+              ))}
+            </ul>
+            {causes.length > 0 && alerts.some((x) => ['loss', 'burn', 'slow', 'material'].includes(x.code)) && (
+              <details className="mt-2 border-t border-line/70 pt-2">
+                <summary className="cursor-pointer font-medium text-ink">Proč? Rozbor podle příčin</summary>
+                <ul className="mt-2 space-y-2">
+                  {causes.map((c) => (
+                    <li key={c.key}>
+                      <span className="flex justify-between gap-3 font-medium text-ink">
+                        {c.label}
+                        <span className="tabular-nums text-crit-ink">−{fmt.czk(c.amount)}</span>
+                      </span>
+                      <span className="block text-ink-2">{c.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
         )}
         {/* Finanční souhrn */}
         <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
@@ -525,6 +556,7 @@ export function JobDetail({
         </>
         )}
       </div>
+      <MessageDrawer job={job} settings={settings} members={members} open={msgOpen} onClose={() => setMsgOpen(false)} onCopied={onToast} />
     </motion.article>
   );
 }

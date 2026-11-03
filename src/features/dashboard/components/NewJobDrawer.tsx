@@ -168,7 +168,7 @@ export function NewJobDrawer({ open, onClose, members, existingJobs, onCreate, e
   }, [workers, form.workerIds]);
 
   /** Odhad hodin z historie dokončených zakázek stejného oboru. */
-  const estimate = useMemo(() => estimateHours(form.trade, Number(form.laborHours) || 0, existingJobs), [form.trade, form.laborHours, existingJobs]);
+  const estimate = useMemo(() => estimateHours(form.trade, Number(form.laborHours) || 0, existingJobs, form.workerIds), [form.trade, form.laborHours, existingJobs, form.workerIds]);
 
   const revenue = Number(form.revenue) || 0;
   const laborCost = Math.round((Number(form.laborHours) || 0) * hourlyCost);
@@ -374,7 +374,14 @@ export function NewJobDrawer({ open, onClose, members, existingJobs, onCreate, e
             {estimate && Math.abs(estimate.ratio - 1) >= 0.08 && Number(form.laborHours) !== estimate.suggested && (
               <div className="col-span-2 flex flex-wrap items-center gap-2 rounded-lg bg-series-1/8 px-3 py-2 text-sm text-ink">
                 <span className="min-w-0 flex-1">
-                  Zakázky oboru {TRADE_LABEL[form.trade]} trvaly v průměru o {Math.round(Math.abs(estimate.ratio - 1) * 100)} % {estimate.ratio > 1 ? 'déle' : 'kratší dobu'} než plán ({estimate.basedOn} zakázek). Realisticky <strong className="tabular-nums">{estimate.suggested} h</strong>.
+                  Zakázky oboru {TRADE_LABEL[form.trade]} trvaly v průměru o {Math.round(Math.abs(estimate.tradeRatio - 1) * 100)} % {estimate.tradeRatio > 1 ? 'déle' : 'kratší dobu'} než plán ({estimate.basedOn} zakázek)
+                  {estimate.crewBasedOn > 0 && Math.abs(estimate.crewFactor - 1) >= 0.03 && (
+                    <>
+                      {' '}
+                      a vybraná parta je o {Math.round(Math.abs(estimate.crewFactor - 1) * 100)} % {estimate.crewFactor < 1 ? 'rychlejší' : 'pomalejší'} než průměr firmy
+                    </>
+                  )}
+                  . Realisticky <strong className="tabular-nums">{estimate.suggested} h</strong>.
                 </span>
                 <button type="button" onClick={() => set('laborHours', String(estimate.suggested))} className="h-8 rounded-md bg-ink px-3 text-sm font-semibold text-white">
                   Použít

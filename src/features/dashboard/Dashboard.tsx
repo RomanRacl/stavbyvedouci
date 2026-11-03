@@ -282,7 +282,7 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
 
             {/* Master-Detail */}
             <div className="grid gap-5 lg:h-[calc(100dvh-7rem)] lg:min-h-[560px] lg:grid-cols-[minmax(320px,2fr)_3fr]">
-              <JobList jobs={jobs} selectedId={selectedId} onSelect={select} />
+              <JobList jobs={jobs} selectedId={selectedId} onSelect={select} onToast={(text) => setToast({ text, tone: 'success' })} />
 
               {/* Desktop: pravý panel. Mobil: celoobrazovkový list přes seznam. */}
               <section
