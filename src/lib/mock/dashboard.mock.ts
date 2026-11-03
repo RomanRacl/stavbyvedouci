@@ -1,4 +1,4 @@
-import type { AuditEntry, Certificate, RecurringPlan, CompanySettings, Job, JobNote, JobTemplate, MaterialItem, Member, MaterialUsage, PeriodStat, Quote, StockMove, Supplier, TimeLog, Van } from '@/types/firestore';
+import type { AuditEntry, Certificate, Lead, RecurringPlan, CompanySettings, Job, JobNote, JobTemplate, MaterialItem, Member, MaterialUsage, PeriodStat, Quote, StockMove, Supplier, TimeLog, Van } from '@/types/firestore';
 
 /** Mock data 1:1 podle schématu Firestore (po konvertoru Timestamp -> Date). */
 
@@ -38,7 +38,7 @@ export const mockJobs: Job[] = [
       confirmations: { u_dvorak: d('2026-10-12T06:55:00'), u_kral: d('2026-10-12T07:02:00') },
     },
     vatMode: 'reduced12',
-    payments: [{ id: 'pay_seed1', label: 'Záloha 40 %', amount: 83328, dueDate: d('2026-10-09'), issuedAt: d('2026-10-02'), paidAt: d('2026-10-07') }],
+    payments: [{ id: 'pay_seed1', label: 'Záloha 40 %', amount: 83328, dueDate: d('2026-10-09'), issuedAt: d('2026-10-02'), paidAt: d('2026-10-07'), number: 'ZF-2026-0001', taxDocNumber: 'DD-2026-0001' }],
     materialPlan: [
       { materialId: 'mat_cyky3x25', name: 'Kabel CYKY-J 3×2,5', unit: 'm', unitCost: 32, plannedQty: 600, usedQty: 470 },
       { materialId: 'mat_cyky3x15', name: 'Kabel CYKY-J 3×1,5', unit: 'm', unitCost: 22, plannedQty: 450, usedQty: 380 },
@@ -61,8 +61,8 @@ export const mockJobs: Job[] = [
     progressPct: 30,
     vatMode: 'reduced12',
     payments: [
-      { id: 'pay_seed2', label: 'Záloha na materiál', amount: 154560, dueDate: d('2026-10-17'), issuedAt: d('2026-10-05'), paidAt: d('2026-10-15') },
-      { id: 'pay_seed3', label: 'Průběžná platba po 50 %', amount: 150000, dueDate: d('2026-10-27'), issuedAt: d('2026-10-20'), paidAt: null },
+      { id: 'pay_seed2', label: 'Záloha na materiál', amount: 154560, dueDate: d('2026-10-17'), issuedAt: d('2026-10-05'), paidAt: d('2026-10-15'), number: 'ZF-2026-0002', taxDocNumber: 'DD-2026-0002' },
+      { id: 'pay_seed3', label: 'Průběžná platba po 50 %', amount: 150000, dueDate: d('2026-10-27'), issuedAt: d('2026-10-20'), paidAt: null, number: 'ZF-2026-0003' },
     ],
     materialPlan: [
       { materialId: 'mat_ppr32', name: 'Trubka PPR 32 PN20', unit: 'm', unitCost: 118, plannedQty: 420, usedQty: 190 },
@@ -150,7 +150,7 @@ const m = (id: string, sku: string, name: string, category: string, unit: Materi
 });
 
 export const mockMaterials: MaterialItem[] = [
-  m('mat_cyky3x25', 'CYKY-3x2.5', 'Kabel CYKY-J 3×2,5', 'Elektro', 'm', 32, 850, 'Elfetex'),
+  { ...m('mat_cyky3x25', 'CYKY-3x2.5', 'Kabel CYKY-J 3×2,5', 'Elektro', 'm', 34, 850, 'Elfetex'), priceHistory: [{ at: new Date(Date.now() - 40 * 86_400_000), unitCost: 29 }, { at: new Date(Date.now() - 9 * 86_400_000), unitCost: 32 }] },
   m('mat_cyky3x15', 'CYKY-3x1.5', 'Kabel CYKY-J 3×1,5', 'Elektro', 'm', 22, 1200, 'Elfetex'),
   m('mat_cyky5x25', 'CYKY-5x2.5', 'Kabel CYKY-J 5×2,5', 'Elektro', 'm', 54, 300, 'Elfetex'),
   m('mat_krabkp68', 'KP68', 'Krabice KP 68', 'Elektro', 'ks', 14, 400, 'Elfetex'),
@@ -159,13 +159,13 @@ export const mockMaterials: MaterialItem[] = [
   m('mat_chranic', 'OFI-40-4', 'Proudový chránič 40A/30mA 4P', 'Elektro', 'ks', 1290, 2, 'Elfetex', 4),
   m('mat_rozv36', 'RZ-36', 'Rozvodnice 36 mod.', 'Elektro', 'ks', 2890, 4, 'Elfetex'),
   m('mat_rozv54', 'RZ-54-IP65', 'Rozvaděč 54 mod. IP65', 'Elektro', 'ks', 6900, 2, 'Elfetex'),
-  m('mat_zasuvka', 'ZAS-2P', 'Zásuvka dvojnásobná bílá', 'Elektro', 'ks', 129, 150, 'Elfetex'),
+  { ...m('mat_zasuvka', 'ZAS-2P', 'Zásuvka dvojnásobná bílá', 'Elektro', 'ks', 135, 150, 'Elfetex'), priceHistory: [{ at: new Date(Date.now() - 12 * 86_400_000), unitCost: 129 }] },
   m('mat_ppr32', 'PPR-32-20', 'Trubka PPR 32 PN20', 'Voda a topení', 'm', 118, 500, 'Ptáček'),
   m('mat_ppr25', 'PPR-25-20', 'Trubka PPR 25 PN20', 'Voda a topení', 'm', 74, 600, 'Ptáček'),
   m('mat_izol32', 'TUB-32-13', 'Izolace Tubolit 32/13', 'Voda a topení', 'm', 41, 400, 'Ptáček'),
   m('mat_ventil', 'KV-54', 'Kulový ventil 5/4"', 'Voda a topení', 'ks', 486, 6, 'Ptáček', 10),
   m('mat_koleno32', 'PPR-K32', 'Koleno PPR 32/90°', 'Voda a topení', 'ks', 19, 300, 'Ptáček'),
-  m('mat_okno1215', 'OK-120150-3', 'Okno plast. 120×150, trojsklo', 'Okna', 'ks', 11800, 0, 'Oknoplast', 0),
+  { ...m('mat_okno1215', 'OK-120150-3', 'Okno plast. 120×150, trojsklo', 'Okna', 'ks', 11800, 0, 'Oknoplast', 0), priceHistory: [{ at: new Date(Date.now() - 25 * 86_400_000), unitCost: 11200 }] },
   m('mat_pena', 'PU-750', 'PU pěna nízkoexp. 750 ml', 'Okna', 'ks', 189, 8, 'Oknoplast', 20),
   m('mat_paska', 'OP-VN', 'Okenní páska vnitřní', 'Okna', 'm', 26, 300, 'Oknoplast'),
   m('mat_obklad', 'OBK-3060', 'Obklad 30×60 rektif.', 'Stavba', 'm', 690, 60, 'Siko'),
@@ -304,7 +304,7 @@ export const mockSettings: CompanySettings = {
   address: MOCK_COMPANY.address,
   phone: MOCK_COMPANY.phone,
   email: '',
-  bankAccount: '',
+  bankAccount: '2801234567/2010',
   logo: null,
   vatPayer: true,
   defaultVatMode: 'reduced12',
@@ -321,6 +321,15 @@ export const mockSettings: CompanySettings = {
     { id: 'oh6', label: 'Pojištění odpovědnosti', monthly: 2500 },
   ],
   capacityHours: 600,
+  priceLevels: [
+    { id: 'pl_std', name: 'Běžný zákazník', discountPct: 0 },
+    { id: 'pl_loyal', name: 'Stálý zákazník', discountPct: 5 },
+    { id: 'pl_dev', name: 'Developer, správce domů', discountPct: 10 },
+  ],
+  warrantyMonths: 24,
+  legalForm: 'sro',
+  reminderDays: [3, 10, 20],
+  eurRate: 24.3,
 };
 
 export const mockQuotes: Quote[] = [
@@ -350,6 +359,7 @@ export const mockQuotes: Quote[] = [
     note: '',
     validUntil: d('2026-11-28'), templateId: null, createdAt: d('2026-10-28T15:00:00'), sentAt: null, decidedAt: null, jobId: null,
   },
+  ...decidedQuotes(),
 ];
 
 /**
@@ -442,6 +452,7 @@ function historyJobs(): Job[] {
     const vatMode: Job['vatMode'] = r() < 0.75 ? 'reduced12' : 'standard21';
     const gross = Math.round(revenue * (vatMode === 'reduced12' ? 1.12 : 1.21));
     const unpaid = dueDate.getTime() > now - 5 * day && r() < 0.6;
+    const paidAt = unpaid ? null : new Date(dueDate.getTime() + Math.round(between(-6, 9)) * day);
     const catalogLine = (id: string, share: number) => {
       const c = mockMaterials.find((x) => x.id === id)!;
       const planned = Math.max(1, Math.round((materialBudget * share) / c.unitCost));
@@ -479,10 +490,10 @@ function historyJobs(): Job[] {
           amount: gross,
           dueDate,
           issuedAt,
-          paidAt: unpaid ? null : new Date(dueDate.getTime() + Math.round(between(-6, 9)) * day),
+          paidAt,
         },
       ],
-      invoice: { number: `PF-${start.getFullYear()}-${String(i + 1).padStart(4, '0')}`, issuedAt, taxDate: handoverAt, dueDate },
+      invoice: { number: `PF-${start.getFullYear()}-${String(i + 1).padStart(4, '0')}`, issuedAt, taxDate: handoverAt, dueDate, paidAt, reminders: [] },
       approval: { approvedBy: 'u_owner', approvedAt: new Date(handoverAt.getTime() + day) },
       createdAt: new Date(start.getTime() - 10 * day),
       updatedAt: issuedAt,
@@ -529,4 +540,83 @@ export const mockAudit: AuditEntry[] = [
   { id: 'au_s1', jobId: 'job_0142', at: d('2026-10-12T07:10:00'), by: 'u_svoboda', kind: 'diary', text: 'Převzetí staveniště od zákazníka, přípojka elektro odpojena distributorem.' },
   { id: 'au_s2', jobId: 'job_0142', at: d('2026-10-20T15:30:00'), by: 'u_dvorak', kind: 'diary', text: 'Drážky ve 2. NP hotové, zedník začistí do čtvrtka.' },
   { id: 'au_s3', jobId: 'job_0145', at: d('2026-10-24T10:10:00'), by: 'u_hajek', kind: 'diary', text: 'Ve 3. patře jiný rozvod než ve výkresu, upraveno po dohodě s předsedou SVJ.' },
+];
+
+/* ---------- fáze 8: obchod ---------- */
+
+/** Rozhodnuté nabídky za poslední půlrok – podklad pro statistiku úspěšnosti. */
+function decidedQuotes(): Quote[] {
+  const rows: Array<[string, Quote['trade'], string, number, 'accepted' | 'rejected', Quote['lostReason'], number]> = [
+    ['Elektroinstalace RD Polná', 'electro', 'Rodina Bártových', 168000, 'accepted', null, 150],
+    ['Koupelna 2. NP', 'construction', 'Ing. Jiří Malý', 212000, 'rejected', 'price', 140],
+    ['Rozvody vody a odpadu', 'plumbing', 'SVJ Lesní 4', 96000, 'accepted', null, 120],
+    ['Tepelné čerpadlo 9 kW', 'hvac', 'Rodina Kratochvílových', 289000, 'rejected', 'competitor', 110],
+    ['Výměna oken, 8 ks', 'windows', 'Hana Pospíšilová', 142000, 'accepted', null, 95],
+    ['Půdní vestavba, SDK', 'construction', 'Martin Černý', 178000, 'rejected', 'term', 80],
+    ['Revize a výměna rozvaděče', 'electro', 'Pekárna U Mlýna', 48000, 'accepted', null, 70],
+    ['Klimatizace 3 místnosti', 'hvac', 'Kancelář Exact', 118000, 'rejected', 'price', 55],
+    ['Rekonstrukce WC', 'construction', 'Marie Veselá', 64000, 'accepted', null, 45],
+    ['Rozvody topení v dílně', 'plumbing', 'Autoservis Kubát', 87000, 'rejected', 'no_response', 30],
+    ['Elektroinstalace garáže', 'electro', 'Petr Horák', 39000, 'accepted', null, 21],
+  ];
+  return rows.map(([title, trade, client, net, status, lostReason, ago], i) => {
+    const created = new Date(Date.now() - ago * 86_400_000);
+    const decided = new Date(created.getTime() + (6 + (i % 4) * 4) * 86_400_000);
+    const hours = Math.round((net * 0.55) / 650);
+    return {
+      id: `q_h${i}`,
+      number: `NAB-2026-${String(i + 1).padStart(4, '0')}`,
+      status,
+      title,
+      trade,
+      vatMode: 'reduced12',
+      client: { name: client, phone: '', email: '', address: '', ico: '' },
+      items: [
+        { id: `qh${i}a`, kind: 'labor', text: 'Práce', qty: hours, unit: 'h', unitPrice: 650 },
+        { id: `qh${i}b`, kind: 'other', text: 'Materiál a doprava', qty: 1, unit: 'kpl', unitPrice: net - hours * 650 },
+      ],
+      note: '',
+      validUntil: new Date(created.getTime() + 30 * 86_400_000),
+      templateId: null,
+      createdAt: created,
+      sentAt: created,
+      decidedAt: decided,
+      jobId: null,
+      lostReason,
+    };
+  });
+}
+
+const inDays = (n: number) => new Date(Date.now() + n * 86_400_000);
+const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
+
+export const mockLeads: Lead[] = [
+  {
+    id: 'lead1', title: 'Elektroinstalace bytu 3+1', trade: 'electro', clientName: 'Jana Svobodová', phone: '+420 731 555 210', email: '', address: 'Okružní 8, Žďár nad Sázavou',
+    source: 'referral', stage: 'quote', value: 0, note: 'Doporučila paní Veselá.', nextStep: inDays(2), quoteId: 'q_seed1', lostReason: null, createdAt: daysAgo(16), updatedAt: daysAgo(12),
+  },
+  {
+    id: 'lead2', title: 'Výměna 5 oken v přízemí', trade: 'windows', clientName: 'Tomáš Kříž', phone: '+420 604 330 118', email: '', address: 'Zahradní 41, Nové Město na Moravě',
+    source: 'web', stage: 'survey', value: 0, note: 'Obhlídka hotová, chce trojskla.', nextStep: inDays(1), quoteId: 'q_seed2', lostReason: null, createdAt: daysAgo(9), updatedAt: daysAgo(6),
+  },
+  {
+    id: 'lead3', title: 'Rekonstrukce koupelny', trade: 'construction', clientName: 'Rodina Šimkových', phone: '+420 777 210 450', email: 'simkovi@email.cz', address: 'Polní 12, Svratka',
+    source: 'web', stage: 'inquiry', value: 180000, note: 'Poptávka z webu, chtějí začít v lednu.', nextStep: inDays(0), quoteId: null, lostReason: null, createdAt: daysAgo(1), updatedAt: daysAgo(1),
+  },
+  {
+    id: 'lead4', title: 'Tepelné čerpadlo do RD', trade: 'hvac', clientName: 'Ing. Radek Novák', phone: '+420 608 991 220', email: '', address: 'Lesní 3, Velké Meziříčí',
+    source: 'portal', stage: 'inquiry', value: 260000, note: 'Z poptávkového portálu, poptává víc firem.', nextStep: inDays(3), quoteId: null, lostReason: null, createdAt: daysAgo(3), updatedAt: daysAgo(3),
+  },
+  {
+    id: 'lead5', title: 'Rozvody vody v bytovém domě', trade: 'plumbing', clientName: 'SVJ Zahradní 12', phone: '+420 566 777 120', email: '', address: 'Zahradní 12, Žďár nad Sázavou',
+    source: 'repeat', stage: 'negotiation', value: 410000, note: 'Řeší se etapizace po stoupačkách.', nextStep: inDays(5), quoteId: null, lostReason: null, createdAt: daysAgo(30), updatedAt: daysAgo(4),
+  },
+  {
+    id: 'lead6', title: 'Klimatizace kanceláře', trade: 'hvac', clientName: 'Kancelář Exact', phone: '', email: '', address: 'Náměstí 5, Bystřice nad Pernštejnem',
+    source: 'phone', stage: 'lost', value: 118000, note: '', nextStep: null, quoteId: null, lostReason: 'price', createdAt: daysAgo(60), updatedAt: daysAgo(40),
+  },
+  {
+    id: 'lead7', title: 'Elektroinstalace garáže', trade: 'electro', clientName: 'Petr Horák', phone: '', email: '', address: 'Krátká 7, Svratka',
+    source: 'referral', stage: 'won', value: 39000, note: '', nextStep: null, quoteId: null, lostReason: null, createdAt: daysAgo(30), updatedAt: daysAgo(20),
+  },
 ];

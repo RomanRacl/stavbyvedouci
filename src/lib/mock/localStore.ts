@@ -3,6 +3,7 @@ import type {
   AuditEntry,
   Certificate,
   Client,
+  Lead,
   RecurringPlan,
   CompanySettings,
   Job,
@@ -48,6 +49,9 @@ export interface Stored {
   clients: Client[];
   recurring: RecurringPlan[] | null;
   certificates: Certificate[] | null;
+  leads: Lead[] | null;
+  /** Odeslané servisní připomínky: klíč připomínky -> kdy. */
+  serviceDone: Record<string, Date>;
 }
 
 const EMPTY: Stored = {
@@ -71,6 +75,8 @@ const EMPTY: Stored = {
   clients: [],
   recurring: null,
   certificates: null,
+  leads: null,
+  serviceDone: {},
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;

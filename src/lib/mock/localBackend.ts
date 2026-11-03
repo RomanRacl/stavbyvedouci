@@ -3,6 +3,10 @@ import type {
   AuditKind,
   Certificate,
   Client,
+  Lead,
+  LeadStage,
+  LostReason,
+  QuoteItem,
   RecurringPlan,
   RevisionReport,
   Stage,
@@ -52,10 +56,12 @@ import {
   mockCertificates,
   mockRecurring,
   mockAudit,
+  mockLeads,
 } from './dashboard.mock';
 import { describeChanges } from '@/lib/audit';
 import { progressFromStages, safetyOf } from '@/lib/operations';
-import { quoteHours, quoteTotals } from '@/lib/money';
+import { activeTier, invoiceBasis, itemsForTier, quoteHours, quoteTotals } from '@/lib/money';
+import { nextDocNumber } from '@/lib/finance';
 import { readStore, updateStore, type Stored } from './localStore';
 
 /**
@@ -84,6 +90,8 @@ export interface Snapshot {
   clients: Client[];
   recurring: RecurringPlan[];
   certificates: Certificate[];
+  leads: Lead[];
+  serviceDone: Record<string, Date>;
 }
 
 const newId = (prefix: string) => `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -113,6 +121,8 @@ function build(s: Stored): Snapshot {
     clients: s.clients,
     recurring: s.recurring ?? mockRecurring,
     certificates: s.certificates ?? mockCertificates,
+    leads: s.leads ?? mockLeads,
+    serviceDone: s.serviceDone ?? {},
   };
 }
 
@@ -529,11 +539,19 @@ export function returnMaterial(uid: string, jobId: string, items: Array<{ materi
 
 const catalogOf = (s: Stored) => s.catalog ?? mockMaterials;
 
+/** Při změně nákupní ceny si položka zapamatuje předchozí cenu (hlídání zdražení). */
+function withPriceHistory(prev: MaterialItem | undefined, next: MaterialItem): MaterialItem {
+  if (!prev || prev.unitCost === next.unitCost) return { ...next, priceHistory: prev?.priceHistory ?? next.priceHistory };
+  const history = [...(prev.priceHistory ?? []), { at: new Date(), unitCost: prev.unitCost }].slice(-12);
+  return { ...next, priceHistory: history };
+}
+
 export function saveCatalogItem(item: MaterialItem) {
   updateStore((s) => {
     const cat = catalogOf(s);
-    const exists = cat.some((c) => c.id === item.id);
-    return { ...s, catalog: exists ? cat.map((c) => (c.id === item.id ? item : c)) : [item, ...cat] };
+    const prev = cat.find((c) => c.id === item.id);
+    const next = withPriceHistory(prev, item);
+    return { ...s, catalog: prev ? cat.map((c) => (c.id === item.id ? next : c)) : [next, ...cat] };
   });
 }
 
@@ -561,7 +579,7 @@ export function importPriceList(rows: ImportRow[], supplier: string): { added: n
       );
       if (i >= 0) {
         const c = cat[i];
-        cat[i] = { ...c, unitCost: r.unitCost, barcode: r.barcode || c.barcode, supplier: supplier || c.supplier };
+        cat[i] = withPriceHistory(c, { ...c, unitCost: r.unitCost, barcode: r.barcode || c.barcode, supplier: supplier || c.supplier });
         if (c.unitCost !== r.unitCost) updated++;
       } else if (r.name) {
         cat.push({
@@ -758,13 +776,31 @@ export function updateQuote(id: string, patch: Partial<Quote>) {
   updateStore((s) => ({ ...s, quotes: quotesOf(s).map((q) => (q.id === id && q.status !== 'accepted' ? { ...q, ...patch } : q)) }));
 }
 
-export function setQuoteStatus(id: string, status: 'sent' | 'rejected' | 'draft') {
+export function setQuoteStatus(id: string, status: 'sent' | 'rejected' | 'draft', lostReason: LostReason | null = null) {
   updateStore((s) => ({
     ...s,
     quotes: quotesOf(s).map((q) =>
       q.id !== id || q.status === 'accepted'
         ? q
-        : { ...q, status, sentAt: status === 'sent' ? q.sentAt ?? new Date() : q.sentAt, decidedAt: status === 'rejected' ? new Date() : null },
+        : {
+            ...q,
+            status,
+            sentAt: status === 'sent' ? q.sentAt ?? new Date() : q.sentAt,
+            decidedAt: status === 'rejected' ? new Date() : null,
+            lostReason: status === 'rejected' ? lostReason ?? 'other' : null,
+          },
+    ),
+  }));
+}
+
+/** Přepočet cen materiálu v nabídce po zdražení u dodavatele. */
+export function repriceQuote(id: string, prices: Array<{ itemId: string; unitPrice: number }>) {
+  updateStore((s) => ({
+    ...s,
+    quotes: quotesOf(s).map((q) =>
+      q.id !== id || q.status === 'accepted'
+        ? q
+        : { ...q, items: q.items.map((i: QuoteItem) => ({ ...i, unitPrice: prices.find((p) => p.itemId === i.id)?.unitPrice ?? i.unitPrice })) },
     ),
   }));
 }
@@ -782,8 +818,11 @@ export function acceptQuote(id: string, plan: { start: Date; due: Date; workerId
   let created: Job | null = null;
   updateStore((s) => {
     const snap = build(s);
-    const q = snap.quotes.find((x) => x.id === id);
-    if (!q || q.status === 'accepted') return s;
+    const found = snap.quotes.find((x) => x.id === id);
+    if (!found || found.status === 'accepted') return s;
+    // U variant se zakázka sestaví jen z položek zvolené varianty.
+    const tier = activeTier(found);
+    const q = { ...found, items: itemsForTier(found.items, tier), tiers: false, chosenTier: tier };
     const now = new Date();
     const totals = quoteTotals(q);
     const hours = quoteHours(q);
@@ -825,6 +864,9 @@ export function acceptQuote(id: string, plan: { start: Date; due: Date; workerId
       payments: [],
       invoice: null,
       quoteId: q.id,
+      clientId: null,
+      currency: q.currency ?? 'CZK',
+      eurRate: q.eurRate ?? null,
       approval: null,
       createdAt: now,
       updatedAt: now,
@@ -833,7 +875,7 @@ export function acceptQuote(id: string, plan: { start: Date; due: Date; workerId
     return {
       ...s,
       created: [job, ...s.created],
-      quotes: quotesOf(s).map((x) => (x.id === id ? { ...x, status: 'accepted', decidedAt: now, jobId: job.id } : x)),
+      quotes: quotesOf(s).map((x) => (x.id === id ? { ...x, status: 'accepted', decidedAt: now, jobId: job.id, chosenTier: tier, lostReason: null } : x)),
     };
   });
   return created;
@@ -845,16 +887,65 @@ export function addPayment(jobId: string, input: { label: string; amount: number
   updateStore((s) => {
     const job = build(s).jobs.find((j) => j.id === jobId);
     if (!job) return s;
-    const p: Payment = { id: newId('pay'), ...input, issuedAt: new Date(), paidAt: null };
+    const all = build(s).jobs.flatMap((j) => (j.payments ?? []).flatMap((x) => (x.number ? [x.number] : [])));
+    const p: Payment = { id: newId('pay'), ...input, issuedAt: new Date(), paidAt: null, number: nextDocNumber('ZF', all), taxDocNumber: null, reminders: [] };
     return patchIn(s, jobId, { payments: [...(job.payments ?? []), p] });
   });
 }
 
+/** Úhrada zálohy: dostane číslo daňového dokladu k přijaté platbě (DD), zrušením se číslo uvolní. */
 export function setPaymentPaid(jobId: string, paymentId: string, paid: boolean) {
+  updateStore((s) => {
+    const jobs = build(s).jobs;
+    const job = jobs.find((j) => j.id === jobId);
+    if (!job) return s;
+    const used = jobs.flatMap((j) => (j.payments ?? []).flatMap((x) => (x.taxDocNumber ? [x.taxDocNumber] : [])));
+    return patchIn(s, jobId, {
+      payments: (job.payments ?? []).map((p) =>
+        p.id === paymentId
+          ? { ...p, paidAt: paid ? new Date() : null, taxDocNumber: paid && !isSettlement(job, p) ? p.taxDocNumber ?? nextDocNumber('DD', used) : null }
+          : p,
+      ),
+    });
+  });
+}
+
+/** Platba vystavená až s fakturou je její úhrada, ne záloha (nedostává daňový doklad k záloze). */
+const isSettlement = (job: Job, p: Payment) => Boolean(job.invoice && p.issuedAt.getTime() >= job.invoice.issuedAt.getTime() - 60_000);
+
+/**
+ * Faktura zaplacena: neuhrazené platby k faktuře se označí jako přijaté, zbytek se doplní
+ * jako nová přijatá platba – cash-flow i přehled záloh tak zůstanou v souladu.
+ */
+export function setInvoicePaid(jobId: string, paid: boolean) {
+  updateStore((s) => {
+    const snap = build(s);
+    const job = snap.jobs.find((j) => j.id === jobId);
+    if (!job?.invoice) return s;
+    const now = new Date();
+    let payments = (job.payments ?? []).map((p) => (isSettlement(job, p) ? { ...p, paidAt: paid ? p.paidAt ?? now : null } : p));
+    if (paid) {
+      const { gross } = invoiceBasis(job, snap.settings);
+      const received = payments.filter((p) => p.paidAt).reduce((a, p) => a + p.amount, 0);
+      const rest = Math.round((gross - received) * 100) / 100;
+      if (rest > 0.5) payments = [...payments, { id: newId('pay'), label: `Úhrada faktury ${job.invoice.number}`, amount: rest, dueDate: job.invoice.dueDate, issuedAt: now, paidAt: now }];
+    }
+    const next = patchIn(s, jobId, { payments, invoice: { ...job.invoice, paidAt: paid ? now : null } });
+    return logIn(next, jobId, 'payment', paid ? `Faktura ${job.invoice.number} uhrazena` : `Úhrada faktury ${job.invoice.number} zrušena`);
+  });
+}
+
+/** Zapíše odeslanou upomínku. Klíč `inv:{jobId}` nebo `pay:{jobId}:{paymentId}`. */
+export function recordReminder(key: string, level: 1 | 2 | 3) {
+  const [kind, jobId, paymentId] = key.split(':');
   updateStore((s) => {
     const job = build(s).jobs.find((j) => j.id === jobId);
     if (!job) return s;
-    return patchIn(s, jobId, { payments: (job.payments ?? []).map((p) => (p.id === paymentId ? { ...p, paidAt: paid ? new Date() : null } : p)) });
+    const entry = { level, at: new Date() };
+    if (kind === 'inv' && job.invoice) {
+      return logIn(patchIn(s, jobId, { invoice: { ...job.invoice, reminders: [...(job.invoice.reminders ?? []), entry] } }), jobId, 'payment', `Odeslána ${level}. upomínka k faktuře ${job.invoice.number}`);
+    }
+    return patchIn(s, jobId, { payments: (job.payments ?? []).map((p) => (p.id === paymentId ? { ...p, reminders: [...(p.reminders ?? []), entry] } : p)) });
   });
 }
 
@@ -875,7 +966,7 @@ export function issueInvoice(jobId: string, opts: { taxDate: Date; dueDays: numb
     const issuedAt = new Date();
     const dueDate = new Date(issuedAt.getTime() + opts.dueDays * 86_400_000);
     const number = nextNumber('PF', snap.jobs.flatMap((j) => (j.invoice ? [j.invoice.number] : [])));
-    return patchIn(s, jobId, { status: 'invoiced', invoice: { number, issuedAt, taxDate: opts.taxDate, dueDate } });
+    return patchIn(s, jobId, { status: 'invoiced', invoice: { number, issuedAt, taxDate: opts.taxDate, dueDate, paidAt: null, reminders: [] } });
   });
 }
 
@@ -1065,4 +1156,94 @@ export function rescheduleJob(jobId: string, opts: { shiftDays?: number; fromWor
       assignedWorkerIds: workers,
     });
   });
+}
+
+/* ---------- fáze 8: obchod ---------- */
+
+const leadsOf = (s: Stored) => s.leads ?? mockLeads;
+
+export function saveLead(lead: Lead): Lead {
+  const next = { ...lead, id: lead.id || newId('lead'), updatedAt: new Date() };
+  updateStore((s) => {
+    const list = leadsOf(s);
+    return { ...s, leads: list.some((l) => l.id === next.id) ? list.map((l) => (l.id === next.id ? next : l)) : [next, ...list] };
+  });
+  return next;
+}
+
+export function setLeadStage(id: string, stage: LeadStage, lostReason: LostReason | null = null) {
+  updateStore((s) => ({
+    ...s,
+    leads: leadsOf(s).map((l) => (l.id === id ? { ...l, stage, lostReason: stage === 'lost' ? lostReason ?? l.lostReason ?? 'other' : null, updatedAt: new Date() } : l)),
+  }));
+}
+
+export function deleteLead(id: string) {
+  updateStore((s) => ({ ...s, leads: leadsOf(s).filter((l) => l.id !== id) }));
+}
+
+/** Nabídka vytvořená z poptávky – poptávka se přesune do fáze Nabídka. */
+export function linkLeadQuote(leadId: string, quoteId: string) {
+  updateStore((s) => ({
+    ...s,
+    leads: leadsOf(s).map((l) => (l.id === leadId ? { ...l, quoteId, stage: l.stage === 'inquiry' || l.stage === 'survey' ? 'quote' : l.stage, updatedAt: new Date() } : l)),
+    quotes: quotesOf(s).map((q) => (q.id === quoteId ? { ...q, leadId } : q)),
+  }));
+}
+
+export function markServiceDone(key: string, done = true) {
+  updateStore((s) => {
+    const next = { ...(s.serviceDone ?? {}) };
+    if (done) next[key] = new Date();
+    else delete next[key];
+    return { ...s, serviceDone: next };
+  });
+}
+
+/**
+ * Reklamace: nová zakázka navázaná na původní. Cena 0 Kč (práce v záruce),
+ * náklady se počítají jako náklady na reklamace.
+ */
+export function createClaim(jobId: string, input: { description: string; start: Date; workerIds: string[] }): Job | null {
+  let created: Job | null = null;
+  updateStore((s) => {
+    const snap = build(s);
+    const orig = snap.jobs.find((j) => j.id === jobId);
+    if (!orig) return s;
+    const now = new Date();
+    const max = snap.jobs.reduce((m, j) => Math.max(m, Number(j.code.split('-')[2]) || 0), 0);
+    const workers = input.workerIds.length ? input.workerIds : orig.assignedWorkerIds;
+    const crew = snap.members.filter((m) => workers.includes(m.uid));
+    const rate = crew.length ? crew.reduce((a, m) => a + m.hourlyCost, 0) / crew.length : DEFAULT_HOURLY_COST;
+    const job: Job = {
+      id: newId('job'),
+      code: `Z-${now.getFullYear()}-${String(max + 1).padStart(4, '0')}`,
+      title: `Reklamace: ${input.description}`,
+      trade: orig.trade,
+      status: 'scheduled',
+      client: orig.client,
+      assignedWorkerIds: workers,
+      schedule: { start: input.start, due: new Date(input.start.getTime() + 86_400_000) },
+      budget: { revenue: 0, laborHours: 4, laborCost: Math.round(4 * rate), materialCost: 0 },
+      actuals: { laborHours: 0, laborCost: 0, materialCost: 0, updatedAt: now },
+      progressPct: 0,
+      materialPlan: [],
+      extraWork: [],
+      handover: null,
+      vatMode: orig.vatMode,
+      payments: [],
+      invoice: null,
+      clientId: orig.clientId ?? null,
+      claimOf: orig.id,
+      approval: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    created = job;
+    let next: Stored = { ...s, created: [job, ...s.created] };
+    next = logIn(next, orig.id, 'edit', `Nahlášena reklamace (${job.code}): ${input.description}`);
+    next = logIn(next, job.id, 'created', `Reklamace k zakázce ${orig.code}: ${input.description}`);
+    return next;
+  });
+  return created;
 }

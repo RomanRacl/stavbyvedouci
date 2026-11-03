@@ -6,16 +6,18 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMemo } from 'react';
 import { stockRows } from '@/lib/stock';
-import { paymentSummary } from '@/lib/money';
 import { allAlerts } from '@/lib/analytics';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { certStatus } from '@/lib/operations';
 import { useSnapshot } from '@/lib/mock/useSnapshot';
+import { receivables } from '@/lib/finance';
+import { leadView, serviceReminders } from '@/lib/sales';
 
 const LINKS = [
   { href: '/dashboard', label: 'Zakázky' },
   { href: '/kalendar', label: 'Kalendář' },
   { href: '/analytika', label: 'Analytika' },
+  { href: '/obchod', label: 'Obchod' },
   { href: '/nabidky', label: 'Nabídky' },
   { href: '/penize', label: 'Peníze' },
   { href: '/sklad', label: 'Sklad' },
@@ -38,9 +40,12 @@ export function OwnerNav() {
     out['/tym'] = snap.certificates.filter((c) => certStatus(c) === 'expired' || certStatus(c) === 'expiring').length;
     out['/zakaznici'] = snap.recurring.filter((r) => r.active && r.nextDate.getTime() - Date.now() < 14 * 86_400_000).length;
     out['/objednavky'] = snap.orders.filter((o) => o.status !== 'received').length;
-    out['/penize'] =
-      snap.jobs.filter((j) => j.status === 'approved').length +
-      snap.jobs.reduce((a, j) => a + paymentSummary(j, snap.settings).overdue.length, 0);
+    out['/penize'] = snap.jobs.filter((j) => j.status === 'approved').length + receivables(snap.jobs, snap.settings).filter((r) => r.nextLevel).length;
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    out['/obchod'] =
+      snap.leads.map((l) => leadView(l, snap.quotes)).filter((l) => l.stage !== 'won' && l.stage !== 'lost' && l.nextStep && l.nextStep <= endOfToday).length +
+      serviceReminders({ jobs: snap.jobs, recurring: snap.recurring, settings: snap.settings }, 7).filter((r) => !snap.serviceDone[r.key]).length;
     return out;
   }, [snap]);
 

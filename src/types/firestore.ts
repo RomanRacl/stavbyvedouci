@@ -24,6 +24,7 @@
  *   companies/{companyId}/recurring/{id}          -> RecurringPlan (pravidelný servis)
  *   companies/{companyId}/certificates/{id}       -> Certificate (oprávnění a školení lidí)
  *   companies/{companyId}/audit/{id}              -> AuditEntry (historie změn + stavební deník)
+ *   companies/{companyId}/leads/{leadId}          -> Lead (poptávka v obchodní pipeline)
  *   companies/{companyId}  (pole settings)        -> CompanySettings
  */
 
@@ -153,6 +154,13 @@ export interface Job {
   clientId?: string | null;
   /** Vznikla z pravidelného servisu. */
   recurringId?: string | null;
+  /** Fakturace v EUR: částky se vedou v Kč, na dokladech se přepočtou kurzem. */
+  currency?: Currency;
+  eurRate?: number | null;
+  /** Délka záruky v měsících (jinak výchozí z Nastavení). */
+  warrantyMonths?: number | null;
+  /** Reklamace: id původní zakázky, na kterou se záruka vztahuje. */
+  claimOf?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -207,6 +215,8 @@ export interface MaterialItem {
   category: string;
   unit: Unit;
   unitCost: number;
+  /** Předchozí nákupní ceny (nejnovější poslední) – pro hlídání zdražení. */
+  priceHistory?: Array<{ at: Date; unitCost: number }>;
   stockQty: number;
   reorderPoint: number;
   supplier: string;
@@ -347,6 +357,17 @@ export interface Payment {
   dueDate: Date;
   issuedAt: Date;
   paidAt: Date | null;
+  /** Číslo výzvy k platbě zálohy (ZF-2026-0001). */
+  number?: string;
+  /** Číslo daňového dokladu k přijaté platbě (DD-2026-0001), vzniká při úhradě. */
+  taxDocNumber?: string | null;
+  /** Odeslané upomínky. */
+  reminders?: ReminderSent[];
+}
+
+export interface ReminderSent {
+  level: 1 | 2 | 3;
+  at: Date;
 }
 
 export interface InvoiceInfo {
@@ -354,6 +375,9 @@ export interface InvoiceInfo {
   issuedAt: Date;
   taxDate: Date;
   dueDate: Date;
+  /** Kdy zákazník fakturu zaplatil (null = neuhrazeno). */
+  paidAt?: Date | null;
+  reminders?: ReminderSent[];
 }
 
 export interface QuoteItem {
@@ -366,7 +390,13 @@ export interface QuoteItem {
   unitPrice: number;
   /** Vazba na katalog – po přijetí se z ní stane plán materiálu. */
   materialId?: string;
+  /** Varianty nabídky: od které varianty je položka zahrnutá (prázdné = ve všech). */
+  tier?: QuoteTier;
 }
+
+export type QuoteTier = 'basic' | 'standard' | 'premium';
+export type Currency = 'CZK' | 'EUR';
+export type LostReason = 'price' | 'term' | 'competitor' | 'no_response' | 'scope' | 'other';
 
 export interface Quote {
   id: string;
@@ -384,6 +414,16 @@ export interface Quote {
   sentAt: Date | null;
   decidedAt: Date | null;
   jobId: string | null;
+  /** Tři varianty (základ / standard / prémium); zákazník vybere jednu. */
+  tiers?: boolean;
+  chosenTier?: QuoteTier | null;
+  /** Sleva v procentech (cenová hladina zákazníka), 0–50. */
+  discountPct?: number;
+  currency?: Currency;
+  eurRate?: number | null;
+  /** Proč zákazník odmítl – pro statistiku úspěšnosti. */
+  lostReason?: LostReason | null;
+  leadId?: string | null;
 }
 
 export interface OverheadItem {
@@ -415,6 +455,49 @@ export interface CompanySettings {
   capacityHours: number;
   /** Stav účtu zadaný majitelem jako start odhadu cash-flow. */
   cashBalance?: number;
+  /** Cenové hladiny zákazníků (sleva z nabídky). */
+  priceLevels?: PriceLevel[];
+  /** Výchozí záruka na dílo v měsících. */
+  warrantyMonths?: number;
+  /** Právní forma pro odhad daní. */
+  legalForm?: 'sro' | 'osvc';
+  /** Kolik dní po splatnosti jde 1., 2. a 3. upomínka. */
+  reminderDays?: [number, number, number];
+  /** Kurz EUR pro nové nabídky (Kč za 1 €). */
+  eurRate?: number;
+}
+
+export interface PriceLevel {
+  id: string;
+  name: string;
+  discountPct: number;
+}
+
+/* ---------- fáze 8: obchod ---------- */
+
+export type LeadStage = 'inquiry' | 'survey' | 'quote' | 'negotiation' | 'won' | 'lost';
+export type LeadSource = 'web' | 'phone' | 'referral' | 'repeat' | 'portal' | 'other';
+
+/** Poptávka v obchodní pipeline: od prvního kontaktu po vyhranou nebo prohranou zakázku. */
+export interface Lead {
+  id: string;
+  title: string;
+  trade: Trade;
+  clientName: string;
+  phone: string;
+  email: string;
+  address: string;
+  source: LeadSource;
+  stage: LeadStage;
+  /** Odhad hodnoty bez DPH. */
+  value: number;
+  note: string;
+  /** Termín obhlídky nebo dalšího kroku. */
+  nextStep: Date | null;
+  quoteId: string | null;
+  lostReason: LostReason | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 /* ---------- fáze 5: provoz ---------- */
@@ -453,6 +536,8 @@ export interface Client {
   email: string;
   address: string;
   note: string;
+  /** Cenová hladina (Nastavení → Cenové hladiny). */
+  priceLevelId?: string | null;
 }
 
 export interface RecurringPlan {

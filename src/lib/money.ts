@@ -1,4 +1,4 @@
-import type { CompanySettings, Job, Member, Payment, Quote, QuoteItem, TimeLog, VatMode } from '@/types/firestore';
+import type { CompanySettings, Job, Member, Payment, Quote, QuoteItem, QuoteTier, TimeLog, VatMode } from '@/types/firestore';
 import { extraWorkOf } from './jobDefaults';
 
 /* ---------- DPH ---------- */
@@ -31,16 +31,41 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export const lineTotal = (i: QuoteItem) => round2(i.qty * i.unitPrice);
 
-export function quoteTotals(q: Pick<Quote, 'items' | 'vatMode'>) {
-  const net = round2(q.items.reduce((a, i) => a + lineTotal(i), 0));
-  const labor = round2(q.items.filter((i) => i.kind === 'labor').reduce((a, i) => a + lineTotal(i), 0));
-  const material = round2(q.items.filter((i) => i.kind === 'material').reduce((a, i) => a + lineTotal(i), 0));
+/* ---------- varianty nabídky ---------- */
+
+export const TIERS: Array<{ id: QuoteTier; label: string; hint: string }> = [
+  { id: 'basic', label: 'Základ', hint: 'nutné minimum' },
+  { id: 'standard', label: 'Standard', hint: 'doporučujeme' },
+  { id: 'premium', label: 'Prémium', hint: 'nejvyšší komfort' },
+];
+const TIER_RANK: Record<QuoteTier, number> = { basic: 0, standard: 1, premium: 2 };
+
+type TotalsInput = Pick<Quote, 'items' | 'vatMode'> & Partial<Pick<Quote, 'tiers' | 'chosenTier' | 'discountPct'>>;
+
+/** Varianta, podle které se nabídka počítá: zvolená zákazníkem, jinak doporučený Standard. */
+export const activeTier = (q: Partial<Pick<Quote, 'tiers' | 'chosenTier'>>): QuoteTier | null => (q.tiers ? q.chosenTier ?? 'standard' : null);
+
+/** Položky zahrnuté ve variantě (položka bez varianty je ve všech). */
+export function itemsForTier(items: QuoteItem[], tier: QuoteTier | null): QuoteItem[] {
+  if (!tier) return items;
+  return items.filter((i) => TIER_RANK[i.tier ?? 'basic'] <= TIER_RANK[tier]);
+}
+
+export function quoteTotals(q: TotalsInput, tier: QuoteTier | null = activeTier(q)) {
+  const items = itemsForTier(q.items, tier);
+  const list = round2(items.reduce((a, i) => a + lineTotal(i), 0));
+  const discountPct = Math.min(50, Math.max(0, q.discountPct ?? 0));
+  const discount = round2((list * discountPct) / 100);
+  const net = round2(list - discount);
+  const k = list ? net / list : 1; // sleva se rozpočítá poměrně do práce i materiálu
+  const labor = round2(items.filter((i) => i.kind === 'labor').reduce((a, i) => a + lineTotal(i), 0) * k);
+  const material = round2(items.filter((i) => i.kind === 'material').reduce((a, i) => a + lineTotal(i), 0) * k);
   const vat = vatOf(net, q.vatMode);
-  return { net, labor, material, other: round2(net - labor - material), vat, gross: round2(net + vat) };
+  return { list, discountPct, discount, net, labor, material, other: round2(net - labor - material), vat, gross: round2(net + vat) };
 }
 
 /** Hodiny práce v nabídce = součet řádků práce v hodinách. */
-export const quoteHours = (q: Pick<Quote, 'items'>) => q.items.filter((i) => i.kind === 'labor' && i.unit === 'h').reduce((a, i) => a + i.qty, 0);
+export const quoteHours = (q: Pick<Quote, 'items'> & Partial<Pick<Quote, 'tiers' | 'chosenTier'>>) => itemsForTier(q.items, activeTier(q)).filter((i) => i.kind === 'labor' && i.unit === 'h').reduce((a, i) => a + i.qty, 0);
 
 /* ---------- zálohy a fakturace ---------- */
 
