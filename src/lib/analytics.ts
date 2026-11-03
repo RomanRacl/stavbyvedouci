@@ -35,7 +35,7 @@ export interface JobOutcome {
 export const isDone = (j: Job) => (j.status === 'approved' || j.status === 'invoiced') && j.progressPct >= 100;
 
 export function outcome(job: Job): JobOutcome {
-  const cost = job.actuals.laborCost + job.actuals.materialCost;
+  const cost = job.actuals.laborCost + job.actuals.materialCost + (job.subcontracts ?? []).reduce((a, x) => a + x.price, 0);
   const finishedAt = job.handover?.signedAt ?? job.actuals.updatedAt;
   const daysLate = Math.round((finishedAt.getTime() - job.schedule.due.getTime()) / DAY);
   const overrun = sum(job.materialPlan.map((l) => Math.max(0, l.usedQty - l.plannedQty) * l.unitCost));
@@ -157,20 +157,98 @@ export function byCrew(outcomes: JobOutcome[], members: Member[]): PeopleRow[] {
 /* ---------- odhad hodin z historie ---------- */
 
 export interface HoursEstimate {
-  ratio: number; // medián skutečné ÷ plánované
-  basedOn: number; // počet zakázek
+  ratio: number; // výsledný poměr skutečné ÷ plánované
+  basedOn: number; // počet zakázek oboru
   suggested: number;
+  tradeRatio: number;
+  /** Parta oproti průměru firmy (<1 = rychlejší). */
+  crewFactor: number;
+  crewBasedOn: number;
 }
 
 /**
  * Návrh realistického počtu hodin: plán × medián poměru skutečnost/plán u dokončených
  * zakázek stejného oboru. Pod 3 zakázkami historie nic nenavrhuje (malý vzorek).
  */
-export function estimateHours(trade: Trade, plannedHours: number, jobs: Job[]): HoursEstimate | null {
-  const os = jobs.filter((j) => isDone(j) && j.trade === trade && j.budget.laborHours > 0).map(outcome);
+export function estimateHours(trade: Trade, plannedHours: number, jobs: Job[], workerIds: string[] = []): HoursEstimate | null {
+  const done = jobs.filter((j) => isDone(j) && j.budget.laborHours > 0).map(outcome);
+  const os = done.filter((o) => o.job.trade === trade);
   if (os.length < 3 || plannedHours <= 0) return null;
-  const ratio = median(os.map((o) => o.hoursRatio));
-  return { ratio, basedOn: os.length, suggested: Math.round(plannedHours * ratio) };
+  const tradeRatio = median(os.map((o) => o.hoursRatio));
+  // Rychlost party: medián jejich zakázek (všech oborů) proti mediánu celé firmy.
+  let crewFactor = 1;
+  let crewBasedOn = 0;
+  if (workerIds.length) {
+    const crew = done.filter((o) => o.job.assignedWorkerIds.some((w) => workerIds.includes(w)));
+    if (crew.length >= 3) {
+      crewFactor = median(crew.map((o) => o.hoursRatio)) / median(done.map((o) => o.hoursRatio));
+      crewBasedOn = crew.length;
+    }
+  }
+  const ratio = tradeRatio * crewFactor;
+  return { ratio, basedOn: os.length, suggested: Math.round(plannedHours * ratio), tradeRatio, crewFactor, crewBasedOn };
+}
+
+/* ---------- proč zakázka ztrácí ---------- */
+
+export interface LossCause {
+  key: 'labor' | 'material' | 'subcontract' | 'extras';
+  label: string;
+  /** O kolik Kč tato příčina snižuje marži proti plánu (kladné = horší). */
+  amount: number;
+  detail: string;
+}
+
+/**
+ * Rozklad zhoršení marže proti rozpočtu na příčiny: práce (pomalejší tempo),
+ * materiál nad plán, subdodávky mimo rozpočet a neschválené vícepráce.
+ */
+export function lossCauses(job: Job): LossCause[] {
+  const p = Math.max(job.progressPct, 1) / 100;
+  const out: LossCause[] = [];
+  const laborForecast = p >= 0.1 ? job.actuals.laborCost / p : job.budget.laborCost;
+  const laborDelta = Math.round(laborForecast - job.budget.laborCost);
+  if (laborDelta >= 1000) {
+    const hoursForecast = p >= 0.1 ? job.actuals.laborHours / p : job.budget.laborHours;
+    const slower = hoursForecast > job.budget.laborHours * 1.02;
+    out.push({
+      key: 'labor',
+      label: slower ? 'Práce trvá déle' : 'Dražší hodina práce',
+      amount: laborDelta,
+      detail: slower
+        ? `Při ${job.progressPct} % hotovo je odpracováno ${Math.round(job.actuals.laborHours)} h. Tímto tempem zakázka zabere asi ${Math.round(hoursForecast)} h místo ${job.budget.laborHours} h.`
+        : 'Hodiny odpovídají plánu, ale pracují lidé s vyšší nákladovou sazbou, než počítal rozpočet.',
+    });
+  }
+  const mat = job.materialPlan
+    .map((l) => {
+      const projected = p >= 0.15 && p < 1 ? l.usedQty / p : Math.max(l.usedQty, l.plannedQty);
+      return { l, over: Math.max(0, projected - l.plannedQty) * l.unitCost };
+    })
+    .filter((x) => x.over > 50)
+    .sort((a, b) => b.over - a.over);
+  const matDelta = Math.round(sum(mat.map((x) => x.over)));
+  if (matDelta >= 1000)
+    out.push({
+      key: 'material',
+      label: 'Materiál nad plán',
+      amount: matDelta,
+      detail: `Nejvíc ${mat
+        .slice(0, 2)
+        .map((x) => x.l.name)
+        .join(' a ')}. Zkontrolujte, jestli nejde o vícepráce, které si zákazník má zaplatit.`,
+    });
+  const subs = (job.subcontracts ?? []).reduce((a, x) => a + x.price, 0);
+  if (subs > 0) out.push({ key: 'subcontract', label: 'Subdodávky', amount: subs, detail: `Práce zadané subdodavatelům za ${czk(subs)}, v rozpočtu zakázky nejsou.` });
+  const pending = extraWorkOf(job).filter((e) => e.status === 'pending');
+  if (pending.length)
+    out.push({
+      key: 'extras',
+      label: 'Neschválené vícepráce',
+      amount: Math.round(sum(pending.map((e) => e.hours * (job.budget.laborHours ? job.budget.laborCost / job.budget.laborHours : 380) + e.materialCost))),
+      detail: `${pending.length} ${pending.length === 1 ? 'vícepráce čeká' : 'vícepráce čekají'} na schválení. Dokud je neschválíte, nejsou v ceně zakázky.`,
+    });
+  return out.sort((a, b) => b.amount - a.amount);
 }
 
 /* ---------- včasné varování ---------- */

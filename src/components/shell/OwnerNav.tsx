@@ -12,6 +12,7 @@ import { certStatus } from '@/lib/operations';
 import { useSnapshot } from '@/lib/mock/useSnapshot';
 import { receivables } from '@/lib/finance';
 import { leadView, serviceReminders } from '@/lib/sales';
+import { absenceConflicts, toolStates } from '@/lib/people';
 
 const LINKS = [
   { href: '/dashboard', label: 'Zakázky' },
@@ -25,6 +26,7 @@ const LINKS = [
   { href: '/sablony', label: 'Šablony' },
   { href: '/zakaznici', label: 'Zákazníci' },
   { href: '/tym', label: 'Tým' },
+  { href: '/provoz', label: 'Provoz' },
 ] as const;
 
 /** Horní navigace kanceláře. Odkazy přes next/link = přechod bez načtení stránky. */
@@ -43,6 +45,10 @@ export function OwnerNav() {
     out['/penize'] = snap.jobs.filter((j) => j.status === 'approved').length + receivables(snap.jobs, snap.settings).filter((r) => r.nextLevel).length;
     const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
+    out['/provoz'] =
+      snap.absences.filter((a) => a.status === 'pending').length +
+      absenceConflicts(snap.absences, snap.jobs).length +
+      toolStates(snap.tools, snap.toolEvents).filter((t) => t.revision === 'overdue').length;
     out['/obchod'] =
       snap.leads.map((l) => leadView(l, snap.quotes)).filter((l) => l.stage !== 'won' && l.stage !== 'lost' && l.nextStep && l.nextStep <= endOfToday).length +
       serviceReminders({ jobs: snap.jobs, recurring: snap.recurring, settings: snap.settings }, 7).filter((r) => !snap.serviceDone[r.key]).length;

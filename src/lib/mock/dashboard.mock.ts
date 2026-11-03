@@ -1,4 +1,4 @@
-import type { AuditEntry, Certificate, Lead, RecurringPlan, CompanySettings, Job, JobNote, JobTemplate, MaterialItem, Member, MaterialUsage, PeriodStat, Quote, StockMove, Supplier, TimeLog, Van } from '@/types/firestore';
+import type { Absence, AuditEntry, Certificate, Lead, Reservation, Subcontractor, Tool, ToolEvent, Trip, RecurringPlan, CompanySettings, Job, JobNote, JobTemplate, MaterialItem, Member, MaterialUsage, PeriodStat, Quote, StockMove, Supplier, TimeLog, Van } from '@/types/firestore';
 
 /** Mock data 1:1 podle schématu Firestore (po konvertoru Timestamp -> Date). */
 
@@ -60,6 +60,7 @@ export const mockJobs: Job[] = [
     actuals: { laborHours: 96, laborCost: 38100, materialCost: 71400, updatedAt: d('2026-10-28T10:05:00') },
     progressPct: 30,
     vatMode: 'reduced12',
+    subcontracts: [{ id: 'sc1', subId: 'sub3', description: 'Výkop a napojení kanalizační přípojky', price: 18500, status: 'done', due: d('2026-10-24') }],
     payments: [
       { id: 'pay_seed2', label: 'Záloha na materiál', amount: 154560, dueDate: d('2026-10-17'), issuedAt: d('2026-10-05'), paidAt: d('2026-10-15'), number: 'ZF-2026-0002', taxDocNumber: 'DD-2026-0002' },
       { id: 'pay_seed3', label: 'Průběžná platba po 50 %', amount: 150000, dueDate: d('2026-10-27'), issuedAt: d('2026-10-20'), paidAt: null, number: 'ZF-2026-0003' },
@@ -330,6 +331,9 @@ export const mockSettings: CompanySettings = {
   legalForm: 'sro',
   reminderDays: [3, 10, 20],
   eurRate: 24.3,
+  bonusSharePct: 20,
+  kmRate: 5.8,
+  goals: { year: new Date().getFullYear(), revenue: 6_000_000, marginPct: 0.25, winRate: 0.5 },
 };
 
 export const mockQuotes: Quote[] = [
@@ -619,4 +623,89 @@ export const mockLeads: Lead[] = [
     id: 'lead7', title: 'Elektroinstalace garáže', trade: 'electro', clientName: 'Petr Horák', phone: '', email: '', address: 'Krátká 7, Svratka',
     source: 'referral', stage: 'won', value: 39000, note: '', nextStep: null, quoteId: null, lostReason: null, createdAt: daysAgo(30), updatedAt: daysAgo(20),
   },
+];
+
+/* ---------- fáze 9: provoz a lidé ---------- */
+
+const ago = (days: number, h = 7) => {
+  const x = new Date(Date.now() - days * 86_400_000);
+  x.setHours(h, 0, 0, 0);
+  return x;
+};
+const ahead = (days: number) => {
+  const x = new Date(Date.now() + days * 86_400_000);
+  x.setHours(0, 0, 0, 0);
+  return x;
+};
+
+/** Kniha jízd posledních ~5 týdnů pro obě auta. */
+export const mockTrips: Trip[] = (() => {
+  const out: Trip[] = [];
+  let odo1 = 84_210;
+  let odo2 = 121_540;
+  const r = rng(42);
+  for (let day = 34; day >= 1; day--) {
+    const wd = ago(day).getDay();
+    if (wd === 0 || wd === 6) continue;
+    const km1 = Math.round(28 + r() * 40);
+    out.push({ id: `trip_a${day}`, vanId: 'van1', driverId: day % 2 ? 'u_dvorak' : 'u_kral', date: ago(day), kmStart: odo1, kmEnd: odo1 + km1, purpose: 'Sklad – stavba – sklad', jobId: 'job_0142' });
+    odo1 += km1;
+    const km2 = Math.round(18 + r() * 30);
+    out.push({ id: `trip_b${day}`, vanId: 'van2', driverId: 'u_hajek', date: ago(day), kmStart: odo2, kmEnd: odo2 + km2, purpose: 'Sklad – stavba – sklad', jobId: day > 15 ? 'job_0137' : 'job_0145', ...(day % 9 === 0 ? { fuelLiters: 62, fuelCost: 2390 } : {}) });
+    odo2 += km2;
+  }
+  return out;
+})();
+
+const tool = (id: string, code: string, name: string, kind: Tool['kind'], category: string, value: number, revisionDue: Date | null, serial = ''): Tool => ({
+  id, code, name, kind, category, serial, value, revisionDue, note: '', active: true,
+});
+
+export const mockTools: Tool[] = [
+  tool('tl1', 'NAR-0001', 'Vrtací kladivo Hilti TE 30', 'tool', 'Elektronářadí', 18900, ahead(120), 'HT30-55120'),
+  tool('tl2', 'NAR-0002', 'Aku vrtačka Makita DDF485', 'tool', 'Elektronářadí', 6400, ahead(200), 'MK-88213'),
+  tool('tl3', 'NAR-0003', 'Revizní přístroj Metrel MI 3152', 'tool', 'Měřicí přístroje', 64000, ahead(18), 'MI3152-1022'),
+  tool('tl4', 'NAR-0004', 'Svářečka PPR Rothenberger', 'tool', 'Voda a topení', 7800, ago(5), 'RO-6610'),
+  tool('tl5', 'NAR-0005', 'Laser křížový Bosch GLL 3-80', 'tool', 'Měřicí přístroje', 11200, ahead(300)),
+  tool('tl6', 'NAR-0006', 'Drážkovací frézka Makita SG1251', 'tool', 'Elektronářadí', 9800, ahead(90)),
+  tool('tl7', 'NAR-0007', 'Lisovací kleště Viega Pressgun', 'tool', 'Voda a topení', 42000, ahead(60)),
+  tool('tl8', 'NAR-0008', 'Vysavač Kärcher NT 30', 'tool', 'Úklid', 6900, null),
+  tool('eq1', 'TEC-0001', 'Pojízdné lešení 6 m', 'equipment', 'Technika', 38000, ahead(140)),
+  tool('eq2', 'TEC-0002', 'Nůžková plošina Genie GS-1932', 'equipment', 'Technika', 280000, ahead(45)),
+  tool('eq3', 'TEC-0003', 'Minibagr Kubota U17 (půjčovna)', 'equipment', 'Technika', 0, null),
+];
+
+export const mockToolEvents: ToolEvent[] = [
+  { id: 'te1', toolId: 'tl1', at: ago(20), by: 'u_owner', action: 'out', holderId: 'u_dvorak', jobId: 'job_0142' },
+  { id: 'te2', toolId: 'tl6', at: ago(20), by: 'u_owner', action: 'out', holderId: 'u_kral', jobId: 'job_0142' },
+  { id: 'te3', toolId: 'tl4', at: ago(14), by: 'u_owner', action: 'out', holderId: 'u_hajek', jobId: 'job_0145' },
+  { id: 'te4', toolId: 'tl7', at: ago(14), by: 'u_owner', action: 'out', holderId: 'u_hajek', jobId: 'job_0145' },
+  { id: 'te5', toolId: 'tl3', at: ago(9), by: 'u_owner', action: 'out', holderId: 'u_svoboda', jobId: 'job_0131' },
+  { id: 'te6', toolId: 'tl3', at: ago(6), by: 'u_svoboda', action: 'in', holderId: null, jobId: null },
+];
+
+export const mockReservations: Reservation[] = [
+  { id: 'rs1', toolId: 'eq1', jobId: 'job_0145', from: ago(10), to: ahead(10), note: 'Stoupačky ve štítu domu' },
+  { id: 'rs2', toolId: 'eq2', jobId: 'job_0148', from: ahead(4), to: ahead(6), note: 'Venkovní jednotka TČ na fasádu' },
+];
+
+export const mockAbsences: Absence[] = [
+  { id: 'ab1', uid: 'u_kral', kind: 'vacation', from: ahead(3), to: ahead(7), status: 'approved', note: 'Rodinná dovolená', createdAt: ago(20), decidedAt: ago(19) },
+  { id: 'ab2', uid: 'u_benes', kind: 'vacation', from: ahead(24), to: ahead(28), status: 'pending', note: '', createdAt: ago(1), decidedAt: null },
+  { id: 'ab3', uid: 'u_hajek', kind: 'sick', from: ago(30), to: ago(27), status: 'approved', note: '', createdAt: ago(30), decidedAt: ago(30) },
+];
+
+export const mockSubcontractors: Subcontractor[] = [
+  {
+    id: 'sub1', name: 'Obklady Říha', ico: '73512044', trade: 'construction', phone: '+420 605 221 870', email: 'riha.obklady@email.cz', note: 'Obklady a dlažby, rychlý, termíny drží.',
+    ratings: [
+      { jobId: 'job_h2', quality: 5, onTime: 4, note: '', at: ago(80) },
+      { jobId: 'job_h9', quality: 4, onTime: 5, note: '', at: ago(40) },
+    ],
+  },
+  {
+    id: 'sub2', name: 'Elektro Mareš', ico: '64221097', trade: 'electro', phone: '+420 731 900 412', email: '', note: 'Revize a měření, v létě vytížený.',
+    ratings: [{ jobId: 'job_h5', quality: 5, onTime: 3, note: 'Revizi dodal o týden později.', at: ago(60) }],
+  },
+  { id: 'sub3', name: 'Zemní práce Kos', ico: '15077820', trade: 'construction', phone: '+420 777 640 111', email: '', note: 'Výkopy a přípojky s vlastním bagrem.', ratings: [] },
 ];

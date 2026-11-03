@@ -4,6 +4,12 @@ import type {
   Certificate,
   Client,
   Lead,
+  Absence,
+  Reservation,
+  Subcontractor,
+  Tool,
+  ToolEvent,
+  Trip,
   RecurringPlan,
   CompanySettings,
   Job,
@@ -52,6 +58,12 @@ export interface Stored {
   leads: Lead[] | null;
   /** Odeslané servisní připomínky: klíč připomínky -> kdy. */
   serviceDone: Record<string, Date>;
+  trips: Trip[];
+  tools: Tool[] | null;
+  toolEvents: ToolEvent[];
+  reservations: Reservation[] | null;
+  absences: Absence[] | null;
+  subcontractors: Subcontractor[] | null;
 }
 
 const EMPTY: Stored = {
@@ -77,6 +89,12 @@ const EMPTY: Stored = {
   certificates: null,
   leads: null,
   serviceDone: {},
+  trips: [],
+  tools: null,
+  toolEvents: [],
+  reservations: null,
+  absences: null,
+  subcontractors: null,
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;

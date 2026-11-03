@@ -3,6 +3,15 @@ import type {
   AuditKind,
   Certificate,
   Client,
+  Absence,
+  Reservation,
+  Subcontractor,
+  SubRating,
+  Subcontract,
+  Tool,
+  ToolEvent,
+  Trip,
+  JobStatus,
   Lead,
   LeadStage,
   LostReason,
@@ -57,9 +66,15 @@ import {
   mockRecurring,
   mockAudit,
   mockLeads,
+  mockTrips,
+  mockTools,
+  mockToolEvents,
+  mockReservations,
+  mockAbsences,
+  mockSubcontractors,
 } from './dashboard.mock';
 import { describeChanges } from '@/lib/audit';
-import { progressFromStages, safetyOf } from '@/lib/operations';
+import { clientKey as clientKeyOf, progressFromStages, safetyOf } from '@/lib/operations';
 import { activeTier, invoiceBasis, itemsForTier, quoteHours, quoteTotals } from '@/lib/money';
 import { nextDocNumber } from '@/lib/finance';
 import { readStore, updateStore, type Stored } from './localStore';
@@ -92,6 +107,12 @@ export interface Snapshot {
   certificates: Certificate[];
   leads: Lead[];
   serviceDone: Record<string, Date>;
+  trips: Trip[];
+  tools: Tool[];
+  toolEvents: ToolEvent[];
+  reservations: Reservation[];
+  absences: Absence[];
+  subcontractors: Subcontractor[];
 }
 
 const newId = (prefix: string) => `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -123,6 +144,12 @@ function build(s: Stored): Snapshot {
     certificates: s.certificates ?? mockCertificates,
     leads: s.leads ?? mockLeads,
     serviceDone: s.serviceDone ?? {},
+    trips: [...mockTrips, ...(s.trips ?? [])],
+    tools: s.tools ?? mockTools,
+    toolEvents: [...mockToolEvents, ...(s.toolEvents ?? [])],
+    reservations: s.reservations ?? mockReservations,
+    absences: s.absences ?? mockAbsences,
+    subcontractors: s.subcontractors ?? mockSubcontractors,
   };
 }
 
@@ -1247,3 +1274,197 @@ export function createClaim(jobId: string, input: { description: string; start: 
   });
   return created;
 }
+
+/* ---------- fáze 9: kniha jízd ---------- */
+
+export function addTrip(input: Omit<Trip, 'id'>): Trip {
+  const trip = { ...input, id: newId('trip') };
+  updateStore((s) => {
+    let next: Stored = { ...s, trips: [...(s.trips ?? []), trip] };
+    if (trip.jobId) next = logIn(next, trip.jobId, 'diary', `Jízda ${trip.kmEnd - trip.kmStart} km: ${trip.purpose}`, trip.driverId);
+    return next;
+  });
+  return trip;
+}
+
+export function deleteTrip(id: string) {
+  updateStore((s) => ({ ...s, trips: (s.trips ?? []).filter((t) => t.id !== id) }));
+}
+
+/* ---------- nářadí a technika ---------- */
+
+const toolsOf = (s: Stored) => s.tools ?? mockTools;
+
+export function saveTool(t: Tool): Tool {
+  let saved = t;
+  updateStore((s) => {
+    const list = toolsOf(s);
+    if (!t.id) {
+      const prefix = t.kind === 'equipment' ? 'TEC' : 'NAR';
+      const max = list.filter((x) => x.code.startsWith(prefix)).reduce((m, x) => Math.max(m, Number(x.code.split('-')[1]) || 0), 0);
+      saved = { ...t, id: newId('tl'), code: t.code || `${prefix}-${String(max + 1).padStart(4, '0')}` };
+      return { ...s, tools: [...list, saved] };
+    }
+    return { ...s, tools: list.map((x) => (x.id === t.id ? t : x)) };
+  });
+  return saved;
+}
+
+/** Výdej nářadí člověku (volitelně na zakázku). */
+export function toolOut(by: string, toolId: string, holderId: string, jobId: string | null = null) {
+  updateStore((s) => ({ ...s, toolEvents: [...(s.toolEvents ?? []), { id: newId('te'), toolId, at: new Date(), by, action: 'out', holderId, jobId }] }));
+}
+
+export function toolIn(by: string, toolId: string) {
+  updateStore((s) => ({ ...s, toolEvents: [...(s.toolEvents ?? []), { id: newId('te'), toolId, at: new Date(), by, action: 'in', holderId: null, jobId: null }] }));
+}
+
+const reservationsOf = (s: Stored) => s.reservations ?? mockReservations;
+
+export function saveReservation(r: Reservation): Reservation {
+  const saved = r.id ? r : { ...r, id: newId('rs') };
+  updateStore((s) => {
+    const list = reservationsOf(s);
+    const tool = toolsOf(s).find((t) => t.id === r.toolId);
+    let next: Stored = { ...s, reservations: list.some((x) => x.id === saved.id) ? list.map((x) => (x.id === saved.id ? saved : x)) : [...list, saved] };
+    if (!r.id && tool) next = logIn(next, r.jobId, 'edit', `Rezervována technika: ${tool.name} (${saved.from.toLocaleDateString('cs-CZ')}–${saved.to.toLocaleDateString('cs-CZ')})`);
+    return next;
+  });
+  return saved;
+}
+
+export function deleteReservation(id: string) {
+  updateStore((s) => ({ ...s, reservations: reservationsOf(s).filter((x) => x.id !== id) }));
+}
+
+/* ---------- absence ---------- */
+
+const absencesOf = (s: Stored) => s.absences ?? mockAbsences;
+
+/** Žádost z mobilu (čeká na schválení), z kanceláře rovnou schválená. */
+export function requestAbsence(uid: string, input: Pick<Absence, 'kind' | 'from' | 'to' | 'note'>, approved = false): Absence {
+  const now = new Date();
+  const a: Absence = { ...input, id: newId('ab'), uid, status: approved ? 'approved' : 'pending', createdAt: now, decidedAt: approved ? now : null };
+  updateStore((s) => ({ ...s, absences: [...absencesOf(s), a] }));
+  return a;
+}
+
+export function decideAbsence(id: string, approve: boolean) {
+  updateStore((s) => ({ ...s, absences: absencesOf(s).map((a) => (a.id === id ? { ...a, status: approve ? 'approved' : 'rejected', decidedAt: new Date() } : a)) }));
+}
+
+export function deleteAbsence(id: string) {
+  updateStore((s) => ({ ...s, absences: absencesOf(s).filter((a) => a.id !== id) }));
+}
+
+/* ---------- subdodavatelé ---------- */
+
+const subsOf = (s: Stored) => s.subcontractors ?? mockSubcontractors;
+
+export function saveSubcontractor(sub: Subcontractor): Subcontractor {
+  const saved = sub.id ? sub : { ...sub, id: newId('sub') };
+  updateStore((s) => {
+    const list = subsOf(s);
+    return { ...s, subcontractors: list.some((x) => x.id === saved.id) ? list.map((x) => (x.id === saved.id ? saved : x)) : [...list, saved] };
+  });
+  return saved;
+}
+
+export function rateSubcontractor(subId: string, rating: Omit<SubRating, 'at'>) {
+  updateStore((s) => ({
+    ...s,
+    subcontractors: subsOf(s).map((x) => (x.id === subId ? { ...x, ratings: [...x.ratings.filter((r) => r.jobId !== rating.jobId), { ...rating, at: new Date() }] } : x)),
+  }));
+}
+
+export function setSubcontracts(jobId: string, list: Subcontract[]) {
+  patchJob(jobId, { subcontracts: list });
+}
+
+export const newSubcontractId = () => newId('sc');
+
+/* ---------- hromadné akce ---------- */
+
+export function bulkShift(jobIds: string[], days: number) {
+  const ms = days * 86_400_000;
+  updateStore((s) => {
+    const jobs = build(s).jobs;
+    let next = s;
+    for (const id of jobIds) {
+      const j = jobs.find((x) => x.id === id);
+      if (j) next = patchIn(next, id, { schedule: { start: new Date(j.schedule.start.getTime() + ms), due: new Date(j.schedule.due.getTime() + ms) } });
+    }
+    return next;
+  });
+}
+
+export function bulkAssign(jobIds: string[], uid: string, mode: 'add' | 'remove') {
+  updateStore((s) => {
+    const jobs = build(s).jobs;
+    let next = s;
+    for (const id of jobIds) {
+      const j = jobs.find((x) => x.id === id);
+      if (!j) continue;
+      const has = j.assignedWorkerIds.includes(uid);
+      if (mode === 'add' && !has) next = patchIn(next, id, { assignedWorkerIds: [...j.assignedWorkerIds, uid] });
+      if (mode === 'remove' && has) next = patchIn(next, id, { assignedWorkerIds: j.assignedWorkerIds.filter((w) => w !== uid) });
+    }
+    return next;
+  });
+}
+
+/** Hromadná změna stavu – jen povolené přechody (schválit čekající, naplánovat koncepty). */
+export function bulkStatus(jobIds: string[], status: JobStatus): number {
+  let changed = 0;
+  updateStore((s) => {
+    const jobs = build(s).jobs;
+    let next = s;
+    const now = new Date();
+    for (const id of jobIds) {
+      const j = jobs.find((x) => x.id === id);
+      if (!j) continue;
+      const ok = (status === 'approved' && j.status === 'awaiting_approval') || (status === 'scheduled' && j.status === 'draft') || (status === 'in_progress' && j.status === 'scheduled');
+      if (!ok) continue;
+      changed++;
+      next = patchIn(next, id, status === 'approved' ? { status, approval: { approvedBy: OFFICE_UID, approvedAt: now } } : { status });
+    }
+    return next;
+  });
+  return changed;
+}
+
+export function bulkDelete(jobIds: string[]) {
+  for (const id of jobIds) deleteJob(id);
+}
+
+/* ---------- import z Excelu ---------- */
+
+export function importClients(rows: Array<Omit<Client, 'id'>>): number {
+  let added = 0;
+  updateStore((s) => {
+    const list = [...s.clients];
+    for (const r of rows) {
+      const id = clientKeyOf(r.name);
+      if (!id) continue;
+      const i = list.findIndex((c) => c.id === id);
+      if (i >= 0) list[i] = { ...list[i], ...Object.fromEntries(Object.entries(r).filter(([, v]) => v)) };
+      else {
+        list.push({ ...r, id });
+        added++;
+      }
+    }
+    return { ...s, clients: list };
+  });
+  return added;
+}
+
+export function importJobs(jobs: Job[]): number {
+  updateStore((s) => {
+    let next: Stored = { ...s, created: [...jobs, ...s.created] };
+    for (const j of jobs) next = logIn(next, j.id, 'created', 'Zakázka naimportována z Excelu');
+    return next;
+  });
+  return jobs.length;
+}
+
+export const newJobId = () => newId('job');

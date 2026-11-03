@@ -25,6 +25,12 @@
  *   companies/{companyId}/certificates/{id}       -> Certificate (oprávnění a školení lidí)
  *   companies/{companyId}/audit/{id}              -> AuditEntry (historie změn + stavební deník)
  *   companies/{companyId}/leads/{leadId}          -> Lead (poptávka v obchodní pipeline)
+ *   companies/{companyId}/trips/{id}              -> Trip (kniha jízd)
+ *   companies/{companyId}/tools/{id}              -> Tool (nářadí a technika s QR štítkem)
+ *   companies/{companyId}/toolEvents/{id}         -> ToolEvent (append-only: výdej a vrácení)
+ *   companies/{companyId}/reservations/{id}       -> Reservation (rezervace techniky na zakázku)
+ *   companies/{companyId}/absences/{id}           -> Absence (dovolená, nemoc, lékař)
+ *   companies/{companyId}/subcontractors/{id}     -> Subcontractor
  *   companies/{companyId}  (pole settings)        -> CompanySettings
  */
 
@@ -161,6 +167,8 @@ export interface Job {
   warrantyMonths?: number | null;
   /** Reklamace: id původní zakázky, na kterou se záruka vztahuje. */
   claimOf?: string | null;
+  /** Práce zadané subdodavatelům – jejich cena je náklad zakázky. */
+  subcontracts?: Subcontract[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -465,6 +473,126 @@ export interface CompanySettings {
   reminderDays?: [number, number, number];
   /** Kurz EUR pro nové nabídky (Kč za 1 €). */
   eurRate?: number;
+  /** Šablony zpráv zákazníkům (SMS, e-mail). */
+  messageTemplates?: MessageTemplate[];
+  /** Kolik procent z ušetřené práce dostane parta jako odměnu (0–100). */
+  bonusSharePct?: number;
+  /** Náhrada za km pro knihu jízd (Kč/km). */
+  kmRate?: number;
+  /** Roční cíle firmy. */
+  goals?: Goals;
+}
+
+export interface Goals {
+  year: number;
+  revenue: number;
+  marginPct: number;
+  /** Cílová úspěšnost nabídek 0–1. */
+  winRate?: number;
+}
+
+export interface MessageTemplate {
+  id: string;
+  name: string;
+  channel: 'sms' | 'email';
+  /** Text se zástupnými poli {zakaznik}, {adresa}, {zacatek}, {konec}, {zakazka}, {castka}, {firma}, {telefon}, {mistr}. */
+  text: string;
+}
+
+/* ---------- fáze 9: provoz a lidé ---------- */
+
+export interface Trip {
+  id: string;
+  vanId: string;
+  driverId: string;
+  date: Date;
+  kmStart: number;
+  kmEnd: number;
+  purpose: string;
+  jobId: string | null;
+  /** Tankování na cestě (volitelné). */
+  fuelLiters?: number;
+  fuelCost?: number;
+}
+
+export type ToolKind = 'tool' | 'equipment';
+
+/** Nářadí (vrtačka, měřák) nebo technika k rezervaci (lešení, plošina, minibagr). */
+export interface Tool {
+  id: string;
+  /** Kód na QR štítku, např. NAR-0007. */
+  code: string;
+  name: string;
+  kind: ToolKind;
+  category: string;
+  serial: string;
+  value: number;
+  /** Kdy je potřeba revize nebo kalibrace (elektro nářadí, měřicí přístroje). */
+  revisionDue: Date | null;
+  note: string;
+  active: boolean;
+}
+
+export interface ToolEvent {
+  id: string;
+  toolId: string;
+  at: Date;
+  by: string;
+  action: 'out' | 'in';
+  /** Komu bylo vydáno (u výdeje). */
+  holderId: string | null;
+  jobId: string | null;
+}
+
+export interface Reservation {
+  id: string;
+  toolId: string;
+  jobId: string;
+  from: Date;
+  to: Date;
+  note: string;
+}
+
+export type AbsenceKind = 'vacation' | 'sick' | 'doctor' | 'other';
+
+export interface Absence {
+  id: string;
+  uid: string;
+  kind: AbsenceKind;
+  from: Date;
+  to: Date;
+  status: 'pending' | 'approved' | 'rejected';
+  note: string;
+  createdAt: Date;
+  decidedAt: Date | null;
+}
+
+export interface Subcontractor {
+  id: string;
+  name: string;
+  ico: string;
+  trade: Trade;
+  phone: string;
+  email: string;
+  note: string;
+  ratings: SubRating[];
+}
+
+export interface SubRating {
+  jobId: string;
+  quality: number; // 1–5
+  onTime: number; // 1–5
+  note: string;
+  at: Date;
+}
+
+export interface Subcontract {
+  id: string;
+  subId: string;
+  description: string;
+  price: number;
+  status: 'ordered' | 'done' | 'paid';
+  due: Date | null;
 }
 
 export interface PriceLevel {

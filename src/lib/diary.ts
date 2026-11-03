@@ -65,3 +65,27 @@ export function buildDiary(job: Job, src: Sources): DiaryDay[] {
   for (const d of days.values()) d.entries.sort((a, b) => a.at.getTime() - b.at.getTime());
   return [...days.values()].sort((a, b) => b.date.localeCompare(a.date));
 }
+
+/**
+ * Návrh zápisu do stavebního deníku za jeden den, složený z toho, co se ten den na stavbě dělo:
+ * kdo byl a kolik hodin, co se vydalo, kolik fotek, stav etap a dokončenost.
+ * Mistr ho jen zkontroluje a doplní.
+ */
+export function suggestDiaryText(job: Job, days: DiaryDay[], date: string): string {
+  const d = days.find((x) => x.date === date);
+  const h = (n: number) => n.toLocaleString('cs-CZ', { maximumFractionDigits: 1 });
+  const time = (x: Date) => x.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+  const lines: string[] = [];
+  if (d?.people.length) {
+    lines.push(`Na stavbě: ${d.people.map((p) => `${p.name} ${time(p.from)}–${time(p.to)} (${h(p.hours)} h)`).join(', ')}.`);
+  } else lines.push('Na stavbě dnes nikdo nezapsal práci.');
+  const material = d?.entries.filter((e) => e.kind === 'material' && e.text.startsWith('Vydáno')).map((e) => e.text.replace(/^Vydáno /, '')) ?? [];
+  if (material.length) lines.push(`Zabudovaný materiál: ${material.join(', ')}.`);
+  const events = d?.entries.filter((e) => ['stage', 'checklist', 'extra', 'revision', 'handover'].includes(e.kind)).map((e) => e.text) ?? [];
+  if (events.length) lines.push(`${events.join('. ')}.`);
+  const stages = (job.stages ?? []).filter((s) => s.progressPct > 0 && !s.doneAt).map((s) => `${s.name.toLowerCase()} ${s.progressPct} %`);
+  lines.push(stages.length ? `Rozpracováno: ${stages.join(', ')}. Celkem hotovo ${job.progressPct} %.` : `Hotovo ${job.progressPct} %.`);
+  if (d?.photos) lines.push(`Pořízeno ${d.photos} fotek (příloha deníku v aplikaci).`);
+  lines.push('Počasí: ');
+  return lines.join('\n');
+}
