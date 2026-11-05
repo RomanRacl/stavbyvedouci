@@ -21,7 +21,9 @@ import {
   setStageProgress,
   switchStage,
   setPhotoTag,
+  setJobSite,
   setProgress,
+  setTimerGeo,
   startWork,
   stopWork,
   submitForApproval,
@@ -41,6 +43,8 @@ import { TimerButton } from './components/TimerButton';
 import { WorkerJobView } from './components/WorkerJobView';
 import { WorkerPicker } from './components/WorkerPicker';
 import { MoreSheets, MoreTiles, type MoreKind } from './components/MoreSheets';
+import { InstallCard, OfflineBanner } from './components/FieldBanners';
+import { fmtDistance, fmtGeo, geoCheckOn, geoVerdict, getPosition, photoStampOn, siteRadius } from '@/lib/geo';
 import { buzz, useCurrentWorker, useWorkerData } from './hooks/useWorkerData';
 
 const ACTIVE = new Set<Job['status']>(['scheduled', 'in_progress']);
@@ -142,6 +146,15 @@ export default function WorkerApp() {
       return;
     }
     const { stoppedJob, stoppedMinutes } = startWork(me.uid, job.id, stageId);
+    // Poloha se zjišťuje až po startu – práce se zapíše hned, i když GPS chvíli trvá nebo není povolená.
+    if (geoCheckOn(snap.settings)) {
+      void getPosition().then((pos) => {
+        if (!pos) return;
+        setTimerGeo(me.uid, job.id, pos.geo, pos.accuracy);
+        const v = geoVerdict(pos.geo, job.client.geo, pos.accuracy, siteRadius(snap.settings));
+        if (v.kind === 'away') say(t('Pozor: telefon je {d} od stavby. Kancelář to uvidí u záznamu.', { d: fmtDistance(v.distance) }), 'error');
+      });
+    }
     say(
       stoppedJob
         ? t('Ukončeno na {a} ({m}), měřím na {b}.', { a: stoppedJob.code, m: formatMinutes(stoppedMinutes), b: job.code })
@@ -198,6 +211,8 @@ export default function WorkerApp() {
           </button>
           <ThemeToggle className="size-11 rounded-xl border border-line bg-surface" />
         </header>
+
+        <OfflineBanner />
 
         {/* Běžící měření je vždy nahoře, ať je zakázka otevřená, nebo ne. */}
         <AnimatePresence initial={false}>
@@ -266,6 +281,8 @@ export default function WorkerApp() {
           </section>
         )}
 
+        <InstallCard onInstalled={() => say(t('Aplikace je na ploše.'))} />
+
         <MoreTiles
           onOpen={setMore}
           badge={{ absence: snap.absences.filter((a) => a.uid === me.uid && a.status === 'pending').length }}
@@ -281,6 +298,9 @@ export default function WorkerApp() {
             </button>
           ))}
         </div>
+        {geoCheckOn(snap.settings) && (
+          <p className="mx-auto mt-6 max-w-xs text-center text-xs text-ink-3">{t('Při začátku práce se jednou uloží poloha telefonu. Během dne vás aplikace nesleduje.')}</p>
+        )}
       </main>
 
       <AnimatePresence>
@@ -308,6 +328,16 @@ export default function WorkerApp() {
             }}
             notes={snap.notes.filter((n) => n.jobId === openJob.id)}
             onSendNote={(text) => addNote(me.uid, openJob.id, text)}
+            onSaveSite={async () => {
+              const pos = await getPosition(15_000);
+              if (!pos) {
+                say(t('Polohu se nepodařilo zjistit. Povolte polohu pro tuto stránku a zkuste to venku.'), 'error');
+                return;
+              }
+              setJobSite(me.uid, openJob.id, pos.geo);
+              buzz();
+              say(t('Poloha stavby uložena. Navigace teď vede přesně sem.'));
+            }}
             onToggleCheck={(itemId) => toggleChecklistItem(me.uid, openJob.id, itemId)}
             onAddExtra={(input) => {
               addExtraWork(me.uid, openJob.id, input);
@@ -318,7 +348,16 @@ export default function WorkerApp() {
             members={snap.members}
             myUid={me.uid}
             onAddPhotos={async (files) => {
-              const saved = await addPhotos(me.uid, openJob.id, files);
+              const stamp = photoStampOn(snap.settings)
+                ? (at: Date) => {
+                    const geo = timer?.jobId === openJob.id ? timer.geoStart : null;
+                    return [
+                      `${openJob.code} · ${openJob.client.address}`,
+                      `${at.toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })} · ${me.displayName}${geo ? ` · ${fmtGeo(geo)}` : ''}`,
+                    ];
+                  }
+                : null;
+              const saved = await addPhotos(me.uid, openJob.id, files, stamp);
               if (saved === files.length) say(saved === 1 ? t('Fotka uložena.') : saved < 5 ? t('Uloženy {n} fotky.', { n: saved }) : t('Uloženo {n} fotek.', { n: saved }));
               else if (saved > 0) say(t('Uloženo {n} z {total} fotek. Ostatní se nepodařilo načíst.', { n: saved, total: files.length }), 'error');
               else say(t('Fotku se nepodařilo uložit. Zkuste ji vyfotit znovu.'), 'error');

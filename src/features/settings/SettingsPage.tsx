@@ -270,6 +270,22 @@ export default function SettingsPage() {
           </Field>
         </Section>
 
+        <Section title="Terén a mobil" description="Co mobil party ukládá. Poloha se bere jen jednou při začátku práce, během dne se nikdo nesleduje. Lidi o tom informujte (GDPR).">
+          <Field label="Poloha při začátku práce" hint="kancelář uvidí, jestli práce začala na stavbě">
+            <span className="flex h-10 items-center gap-2 text-sm font-normal text-ink">
+              <input type="checkbox" checked={f.geoCheckIn !== false} onChange={(e) => set('geoCheckIn', e.target.checked)} className="size-4" /> Ukládat polohu
+            </span>
+          </Field>
+          <Field label="Okruh stavby" hint="metrů od stavby, které se ještě berou jako „na místě“">
+            <input inputMode="numeric" value={f.siteRadiusM ?? 300} onChange={(e) => set('siteRadiusM', Math.min(5000, Number(e.target.value.replace(/\D/g, '')) || 0))} className={`${inputCls} text-right tabular-nums`} />
+          </Field>
+          <Field label="Razítko na fotkách" hint="kód zakázky, adresa, datum a čas, poloha přímo v obrázku">
+            <span className="flex h-10 items-center gap-2 text-sm font-normal text-ink">
+              <input type="checkbox" checked={f.photoStamp !== false} onChange={(e) => set('photoStamp', e.target.checked)} className="size-4" /> Přidávat razítko
+            </span>
+          </Field>
+        </Section>
+
         <div className="sticky bottom-0 -mx-5 flex justify-end gap-2 border-t border-line bg-surface/95 px-5 py-3 backdrop-blur">
           <button type="button" disabled={!dirty} onClick={() => setF(snap.settings)} className={btnSecondary}>
             Zahodit změny

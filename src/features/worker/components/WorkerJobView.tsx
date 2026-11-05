@@ -1,13 +1,14 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { ArrowLeft, Check, Clock3, Hammer, MapPin, Navigation, Package, Phone, Wrench } from 'lucide-react';
+import { ArrowLeft, Check, Clock3, Crosshair, Hammer, MapPin, Navigation, Package, Phone, Wrench } from 'lucide-react';
 import { localeOf, t } from '@/lib/i18n';
 import { useState } from 'react';
 import { fmt } from '@/features/analytics/lib/metrics';
 import { NotesThread } from '@/features/notes/NotesThread';
 import { checklistOf, extraWorkOf } from '@/lib/jobDefaults';
 import { mapyNavigationUrl } from '@/lib/navigation';
+import { navUrls } from '@/lib/geo';
 import type { ActiveTimer, Job, JobNote, JobPhoto, Member, PhotoTag } from '@/types/firestore';
 import { buzz } from '../hooks/useWorkerData';
 import { ExtraWorkSheet } from './ExtraWorkSheet';
@@ -40,6 +41,8 @@ interface Props {
   onToggleCheck: (itemId: string) => void;
   onAddExtra: (input: { description: string; hours: number; materialCost: number }) => void;
   onSendNote: (text: string) => void;
+  /** Uloží polohu stavby z telefonu (jen když ji zakázka ještě nemá). */
+  onSaveSite?: () => Promise<void>;
 }
 
 const EXTRA_STATUS = {
@@ -56,6 +59,25 @@ function SectionTitle({ id, children, aside }: { id: string; children: string; a
       </h2>
       {aside && <span className="text-sm text-ink-3 tabular-nums">{aside}</span>}
     </div>
+  );
+}
+
+/** Stavba nemá souřadnice: kdo stojí na místě, uloží je jedním klepnutím. */
+function SaveSiteButton({ onSave }: { onSave: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        await onSave();
+        setBusy(false);
+      }}
+      className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line bg-surface text-base font-medium text-ink active:bg-concrete disabled:opacity-60"
+    >
+      <Crosshair className="size-4" /> {busy ? t('Zjišťuji polohu…') : t('Jsem na stavbě – uložit její polohu')}
+    </button>
   );
 }
 
@@ -114,6 +136,16 @@ export function WorkerJobView(p: Props) {
             <Phone className="size-4" /> {t('Zavolat klientovi')}
           </a>
         </div>
+        <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-2">
+          <span>{t('Jiná navigace:')}</span>
+          <a href={navUrls(job).google} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center font-medium text-series-1 underline-offset-2 active:underline">
+            Google Maps
+          </a>
+          <a href={navUrls(job).waze} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center font-medium text-series-1 underline-offset-2 active:underline">
+            Waze
+          </a>
+        </p>
+        {!job.client.geo && p.onSaveSite && !locked && <SaveSiteButton onSave={p.onSaveSite} />}
 
         {locked ? (
           <div className="mt-6 flex items-start gap-3 rounded-2xl bg-warn/12 p-4 text-warn-ink">

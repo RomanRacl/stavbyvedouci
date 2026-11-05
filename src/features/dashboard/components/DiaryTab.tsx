@@ -23,7 +23,7 @@ interface Props {
   catalog: MaterialItem[];
 }
 
-const KIND_LABEL: Record<string, string> = { ...AUDIT_LABEL };
+const KIND_LABEL: Record<string, string> = { ...AUDIT_LABEL, geo: 'Poloha' };
 const dateLabel = (key: string) => new Date(`${key}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 const time = (d: Date) => d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
 

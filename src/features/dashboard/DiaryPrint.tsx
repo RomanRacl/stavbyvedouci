@@ -48,7 +48,7 @@ export default function DiaryPrint({ jobId }: { jobId: string }) {
             {d.entries.map((e, i) => (
               <li key={i}>
                 <span className="tabular-nums">{e.at.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</span>{' '}
-                <span className="font-semibold">{AUDIT_LABEL[e.kind as keyof typeof AUDIT_LABEL] ?? e.kind}:</span> {e.text} <span className="text-ink-3">({name(e.by)})</span>
+                <span className="font-semibold">{e.kind === 'geo' ? 'Poloha' : (AUDIT_LABEL[e.kind as keyof typeof AUDIT_LABEL] ?? e.kind)}:</span> {e.text} <span className="text-ink-3">({name(e.by)})</span>
               </li>
             ))}
           </ul>

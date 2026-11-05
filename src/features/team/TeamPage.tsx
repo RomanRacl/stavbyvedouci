@@ -9,6 +9,7 @@ import { fmt } from '@/features/analytics/lib/metrics';
 import { deleteCertificate, saveCertificate, type Snapshot } from '@/lib/mock/localBackend';
 import { useSnapshot } from '@/lib/mock/useSnapshot';
 import { BonusSection } from './BonusSection';
+import { AttendanceToday } from './AttendanceToday';
 import { CERT_KINDS, certStatus, needsSafety, type CertStatus } from '@/lib/operations';
 import type { CertKind, Certificate, Member } from '@/types/firestore';
 
@@ -43,7 +44,8 @@ export default function TeamPage() {
 
   return (
     <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
-      <PageHeader title="Tým" description="Oprávnění a školení lidí s hlídáním platnosti. Aplikace upozorní, když někoho přiřadíte na práci, na kterou nemá platné oprávnění." />
+      <PageHeader title="Tým" description="Docházka, oprávnění a školení lidí s hlídáním platnosti. Aplikace upozorní, když někoho přiřadíte na práci, na kterou nemá platné oprávnění." />
+      <AttendanceToday snap={snap} />
 
       {(problems.length > 0 || pendingSafety.length > 0) && (
         <div className="mb-5 grid gap-3 lg:grid-cols-2">
