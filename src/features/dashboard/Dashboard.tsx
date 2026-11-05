@@ -219,7 +219,7 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
       <div className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
         {/* Hlavička + filtr období v jedné řadě nad grafy */}
         <header className="mb-6 flex flex-wrap items-end gap-x-6 gap-y-3">
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 basis-full sm:basis-auto sm:flex-1">
             <p className="text-sm text-ink-2">{companyName}</p>
             <h1 className="font-display text-3xl font-bold tracking-tight text-ink sm:text-4xl">Přehled zakázek</h1>
           </div>
@@ -281,7 +281,7 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
             <RevenueCostChart stats={visibleStats} />
 
             {/* Master-Detail */}
-            <div className="grid gap-5 lg:h-[calc(100dvh-7rem)] lg:min-h-[560px] lg:grid-cols-[minmax(320px,2fr)_3fr]">
+            <div className="grid gap-5 lg:h-[calc(100dvh-3.5rem)] lg:min-h-[560px] lg:grid-cols-[minmax(320px,2fr)_3fr]">
               <JobList jobs={jobs} selectedId={selectedId} onSelect={select} onToast={(text) => setToast({ text, tone: 'success' })} />
 
               {/* Desktop: pravý panel. Mobil: celoobrazovkový list přes seznam. */}
