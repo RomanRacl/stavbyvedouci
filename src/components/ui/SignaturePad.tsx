@@ -1,6 +1,7 @@
 'use client';
 
 import { Eraser } from 'lucide-react';
+import { t } from '@/lib/i18n';
 import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 
 interface Props {
@@ -104,7 +105,7 @@ export function SignaturePad({ onChange, height = 180 }: Props) {
           aria-label="Plocha pro podpis"
         />
         {empty && (
-          <span className="pointer-events-none absolute inset-0 grid place-items-center text-base text-ink-3">Podepište se prstem</span>
+          <span className="pointer-events-none absolute inset-0 grid place-items-center text-base text-ink-3">{t('Podepište se prstem')}</span>
         )}
         <span className="pointer-events-none absolute inset-x-6 bottom-8 h-px bg-line" aria-hidden />
       </div>

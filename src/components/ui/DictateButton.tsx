@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Mic, MicOff } from 'lucide-react';
+import { t } from '@/lib/i18n';
 import { useDictation } from '@/lib/useDictation';
 
 /** Tlačítko mikrofonu: diktovaný text připojí k poli. Kde prohlížeč diktování neumí, nezobrazí se. */
@@ -14,7 +15,7 @@ export function DictateButton({ onText, size = 'touch' }: { onText: (t: string) 
         type="button"
         onClick={d.listening ? d.stop : d.start}
         aria-pressed={d.listening}
-        aria-label={d.listening ? 'Zastavit diktování' : 'Diktovat hlasem'}
+        aria-label={d.listening ? t('Zastavit diktování') : t('Diktovat hlasem')}
         className={`relative grid shrink-0 place-items-center rounded-xl transition active:scale-95 ${size === 'touch' ? 'size-12' : 'size-10'} ${
           d.listening ? 'bg-crit text-white' : 'border border-line bg-surface text-ink-2'
         }`}

@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import { Keyboard, X } from 'lucide-react';
+import { t } from '@/lib/i18n';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -22,13 +23,15 @@ interface Props {
   onClose: () => void;
   /** Vrací true, když kód patří známé položce (scanner se zavře), jinak false (ukáže chybu a skenuje dál). */
   onCode: (code: string) => boolean;
+  /** `qr` = štítky nářadí (QR kód, písmena v kódu), jinak EAN zboží. */
+  kind?: 'ean' | 'qr';
 }
 
 /**
  * Skener EAN přes fotoaparát. Používá vestavěné BarcodeDetector API (Chrome na Androidu).
  * Kde ho prohlížeč nemá (iPhone/Safari), nabídne ruční zadání kódu – stejný výsledek.
  */
-export function BarcodeScanner({ open, onClose, onCode }: Props) {
+export function BarcodeScanner({ open, onClose, onCode, kind = 'ean' }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [manual, setManual] = useState(false);
   const [code, setCode] = useState('');
@@ -46,7 +49,7 @@ export function BarcodeScanner({ open, onClose, onCode }: Props) {
     let raf = 0;
     let stopped = false;
     let lastMiss = '';
-    const detector = new window.BarcodeDetector!({ formats: ['ean_13', 'ean_8', 'code_128', 'upc_a'] });
+    const detector = new window.BarcodeDetector!({ formats: kind === 'qr' ? ['qr_code'] : ['ean_13', 'ean_8', 'code_128', 'upc_a'] });
 
     (async () => {
       try {
@@ -64,7 +67,7 @@ export function BarcodeScanner({ open, onClose, onCode }: Props) {
             if (value && value !== lastMiss) {
               if (onCode(value)) return;
               lastMiss = value;
-              setMessage(`Kód ${value} není v katalogu. Požádejte kancelář o doplnění.`);
+              setMessage(t('Kód {code} není v katalogu. Požádejte kancelář o doplnění.', { code: value }));
             }
           } catch {
             /* snímek ještě není připravený */
@@ -74,7 +77,7 @@ export function BarcodeScanner({ open, onClose, onCode }: Props) {
         void tick();
       } catch {
         setManual(true);
-        setMessage('Fotoaparát není dostupný. Zadejte kód ručně.');
+        setMessage(t('Fotoaparát není dostupný. Zadejte kód ručně.'));
       }
     })();
 
@@ -91,7 +94,7 @@ export function BarcodeScanner({ open, onClose, onCode }: Props) {
     e.preventDefault();
     const c = code.replace(/\D/g, '');
     if (!c) return;
-    if (!onCode(c)) setMessage(`Kód ${c} není v katalogu.`);
+    if (!onCode(c)) setMessage(t('Kód {code} není v katalogu.', { code: c }));
   };
 
   if (typeof document === 'undefined') return null;
@@ -106,11 +109,11 @@ export function BarcodeScanner({ open, onClose, onCode }: Props) {
           className="fixed inset-0 z-[80] flex flex-col bg-black text-[#fff]"
           role="dialog"
           aria-modal="true"
-          aria-label="Skenování čárového kódu"
+          aria-label={kind === 'qr' ? t('Skenování QR kódu') : t('Skenování čárového kódu')}
         >
           <header className="flex items-center gap-3 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-3">
-            <p className="flex-1 text-lg font-semibold">Naskenujte čárový kód</p>
-            <button type="button" onClick={onClose} aria-label="Zavřít" className="grid size-12 place-items-center rounded-xl bg-[#fff]/10">
+            <p className="flex-1 text-lg font-semibold">{kind === 'qr' ? t('Naskenujte QR štítek') : t('Naskenujte čárový kód')}</p>
+            <button type="button" onClick={onClose} aria-label={t('Zavřít')} className="grid size-12 place-items-center rounded-xl bg-[#fff]/10">
               <X className="size-6" />
             </button>
           </header>
@@ -132,17 +135,18 @@ export function BarcodeScanner({ open, onClose, onCode }: Props) {
           ) : (
             <form onSubmit={submit} className="flex flex-1 flex-col justify-center gap-3 px-6">
               <label className="text-base text-[#fff]/80">
-                Kód pod čárami (EAN)
+                {kind === 'qr' ? t('Kód na štítku (např. NAR-0007)') : t('Kód pod čárami (EAN)')}
                 <input
                   autoFocus
-                  inputMode="numeric"
+                  inputMode={kind === 'qr' ? 'text' : 'numeric'}
+                  autoCapitalize="characters"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   className="mt-2 block h-14 w-full rounded-xl bg-[#fff] px-4 font-display text-2xl tracking-wider text-[#16202a] tabular-nums"
                 />
               </label>
               <button type="submit" className="h-14 rounded-xl bg-safety text-lg font-bold text-[#16202a]">
-                Najít položku
+                {t('Najít položku')}
               </button>
             </form>
           )}
@@ -155,7 +159,7 @@ export function BarcodeScanner({ open, onClose, onCode }: Props) {
                 onClick={() => setManual((m) => !m)}
                 className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#fff]/10 text-base font-medium"
               >
-                <Keyboard className="size-5" /> {manual ? 'Zpět na fotoaparát' : 'Zadat kód ručně'}
+                <Keyboard className="size-5" /> {manual ? t('Zpět na fotoaparát') : t('Zadat kód ručně')}
               </button>
             )}
           </footer>
