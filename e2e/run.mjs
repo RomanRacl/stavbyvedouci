@@ -143,6 +143,12 @@ test('menu: boční lišta na počítači, výsuvné menu na tabletu', async (pa
   await eventually(async () => (await page.locator('#mobile-menu').count()) === 0, 'menu se po přechodu nezavřelo');
 });
 
+test('tým: docházka dnes s polohou', async (page) => {
+  await go(page, '/tym');
+  await seeText(page, 'Docházka dnes');
+  await seeText(page, 'na stavbě');
+});
+
 test('analytika: cíle a co kdyby', async (page) => {
   await go(page, '/analytika');
   await seeText(page, 'Cíle');
@@ -161,6 +167,27 @@ test('mobil: start a konec práce', async (page) => {
   await seeText(page, 'Zapsáno');
   await page.getByRole('button', { name: 'Začít práci' }).first().click();
   await seeText(page, 'Měřím čas');
+});
+
+test('mobil: poloha při začátku, poloha stavby a bez signálu', async (page) => {
+  await page.context().grantPermissions(['geolocation']);
+  await page.context().setGeolocation({ latitude: 49.59, longitude: 16.0 });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await go(page, '/w');
+  await page.getByText('Ondřej Svoboda').click();
+  await page.locator('main li button').filter({ hasText: 'Z-2026-0148' }).first().click();
+  await page.getByRole('button', { name: 'Jsem na stavbě – uložit její polohu' }).click();
+  await seeText(page, 'Poloha stavby uložena');
+  // Další den začne práci 3 km od stavby → upozornění.
+  await page.context().setGeolocation({ latitude: 49.62, longitude: 16.0 });
+  await page.locator('main.fixed').getByRole('button', { name: /Začít práci/ }).first().click();
+  const safety = page.getByRole('button', { name: 'Byl(a) jsem poučen(a), začít práci' });
+  if (await safety.count()) await safety.click();
+  await seeText(page, 'od stavby');
+  await page.context().setOffline(true);
+  await seeText(page, 'Jste bez signálu');
+  await page.context().setOffline(false);
+  await seeText(page, 'Signál je zpět');
 });
 
 test('mobil: angličtina a ukrajinština', async (page) => {
