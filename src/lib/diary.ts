@@ -1,5 +1,6 @@
 import type { AuditEntry, Job, JobNote, JobPhoto, Member, MaterialUsage, TimeLog } from '@/types/firestore';
 import { dayKey } from './jobDefaults';
+import { DEFAULT_SITE_RADIUS_M, fmtDistance, geoVerdict } from './geo';
 
 export interface DiaryDay {
   date: string; // YYYY-MM-DD
@@ -16,6 +17,8 @@ interface Sources {
   audit: AuditEntry[];
   members: Member[];
   catalog: Array<{ id: string; name: string; unit: string }>;
+  /** Okruh stavby v metrech pro kontrolu polohy. */
+  siteRadiusM?: number;
 }
 
 /**
@@ -44,6 +47,8 @@ export function buildDiary(job: Job, src: Sources): DiaryDay[] {
       if (l.startedAt < p.from) p.from = l.startedAt;
       if (l.endedAt! > p.to) p.to = l.endedAt!;
     } else d.people.push({ uid: l.workerId, name: name(l.workerId), hours, from: l.startedAt, to: l.endedAt! });
+    const v = geoVerdict(l.geoStart, job.client.geo, l.geoAccuracy ?? 0, src.siteRadiusM ?? DEFAULT_SITE_RADIUS_M);
+    if (v.kind === 'away') d.entries.push({ at: l.startedAt, by: l.workerId, kind: 'geo', text: `Začátek práce ${fmtDistance(v.distance)} od stavby` });
   }
   for (const u of src.usage.filter((x) => x.jobId === job.id)) {
     const item = src.catalog.find((c) => c.id === u.materialId) ?? job.materialPlan.find((l) => l.materialId === u.materialId);

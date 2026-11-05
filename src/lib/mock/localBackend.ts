@@ -41,6 +41,7 @@ import type {
   Supplier,
   TimeLog,
   Van,
+  GeoPoint,
 } from '@/types/firestore';
 import type { ImportRow } from '@/lib/import/priceList';
 import { stockAt, vanOf } from '@/lib/stock';
@@ -233,7 +234,8 @@ function stopIn(s: Stored, uid: string, endAt = new Date()): { s: Stored; minute
     endedAt: end,
     durationMin: minutes,
     costSnapshot: Math.round(hours * member.hourlyCost),
-    geoStart: null,
+    geoStart: timer.geoStart ?? null,
+    geoAccuracy: timer.geoAccuracy ?? null,
     breakMin: Math.max(0, totalMin - minutes),
     stageId: timer.stageId ?? null,
   };
@@ -394,18 +396,20 @@ export function submitForApproval(uid: string, jobId: string, handover: Omit<Han
  * Přidá fotky k zakázce: zmenší je, soubory uloží do IndexedDB a metadata do úložiště.
  * Vrací počet úspěšně uložených. V produkci: uploadBytes do Storage + addDoc do `photos`.
  */
-export async function addPhotos(uid: string, jobId: string, files: File[]): Promise<number> {
+/** `stamp` vrátí řádky razítka pro fotku pořízenou v daný čas (null = bez razítka). */
+export async function addPhotos(uid: string, jobId: string, files: File[], stamp?: ((takenAt: Date) => string[]) | null): Promise<number> {
   const saved: JobPhoto[] = [];
   for (const file of files) {
     try {
-      const { blob, width, height } = await compressImage(file);
+      const takenAt = new Date(file.lastModified || Date.now());
+      const { blob, width, height } = await compressImage(file, 1600, 0.8, stamp ? stamp(takenAt) : null);
       const id = `ph_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
       await putPhotoBlob(id, blob);
       saved.push({
         id,
         jobId,
         workerId: uid,
-        takenAt: new Date(file.lastModified || Date.now()),
+        takenAt,
         storagePath: `jobs/${jobId}/photos/${id}.jpg`,
         width,
         height,
@@ -427,6 +431,26 @@ export async function deletePhoto(photoId: string) {
 
 export function setPhotoTag(photoId: string, tag: PhotoTag | null) {
   updateStore((s) => ({ ...s, photos: s.photos.map((p) => (p.id === photoId ? { ...p, tag } : p)) }));
+}
+
+/* ---------- poloha v terénu ---------- */
+
+/** Doplní polohu k právě běžícímu měření (zjišťuje se až po startu, aby start nečekal na GPS). */
+export function setTimerGeo(uid: string, jobId: string, geo: GeoPoint, accuracy: number) {
+  updateStore((s) => {
+    const t = s.timers[uid] ?? build(s).members.find((m) => m.uid === uid)?.activeTimer;
+    if (!t || t.jobId !== jobId || t.geoStart) return s;
+    return { ...s, timers: { ...s.timers, [uid]: { ...t, geoStart: geo, geoAccuracy: accuracy } } };
+  });
+}
+
+/** Dělník stojí na stavbě a uloží její polohu – zpřesní navigaci a kontrolu docházky. */
+export function setJobSite(uid: string, jobId: string, geo: GeoPoint) {
+  updateStore((s) => {
+    const job = build(s).jobs.find((j) => j.id === jobId);
+    if (!job) return s;
+    return logIn(patchIn(s, jobId, { client: { ...job.client, geo } }), jobId, 'edit', 'Uložena poloha stavby z mobilu', uid);
+  });
 }
 
 /* ---------- přestávky ---------- */

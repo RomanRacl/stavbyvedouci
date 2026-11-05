@@ -12,9 +12,9 @@ export const MOCK_COMPANY = { name: 'Novák Stavby s.r.o.', address: 'Nádražn�
 
 export const mockMembers: Member[] = [
   { uid: 'u_owner', displayName: 'Petr Novák', initials: 'PN', role: 'owner', phone: '+420 602 111 222', hourlyCost: 0, active: true, activeTimer: null },
-  { uid: 'u_dvorak', displayName: 'Jan Dvořák', initials: 'JD', role: 'worker', phone: '+420 603 445 120', hourlyCost: 380, active: true, activeTimer: { logId: 'tl_901', jobId: 'job_0142', startedAt: minutesAgo(95) } },
-  { uid: 'u_kral', displayName: 'Martin Král', initials: 'MK', role: 'worker', phone: '+420 731 202 334', hourlyCost: 360, active: true, activeTimer: { logId: 'tl_902', jobId: 'job_0142', startedAt: minutesAgo(88) } },
-  { uid: 'u_hajek', displayName: 'Tomáš Hájek', initials: 'TH', role: 'worker', phone: '+420 724 889 010', hourlyCost: 420, active: true, activeTimer: { logId: 'tl_903', jobId: 'job_0145', startedAt: minutesAgo(130) } },
+  { uid: 'u_dvorak', displayName: 'Jan Dvořák', initials: 'JD', role: 'worker', phone: '+420 603 445 120', hourlyCost: 380, active: true, activeTimer: { logId: 'tl_901', jobId: 'job_0142', startedAt: minutesAgo(95), geoStart: { lat: 49.56284, lng: 15.93961 }, geoAccuracy: 12 } },
+  { uid: 'u_kral', displayName: 'Martin Král', initials: 'MK', role: 'worker', phone: '+420 731 202 334', hourlyCost: 360, active: true, activeTimer: { logId: 'tl_902', jobId: 'job_0142', startedAt: minutesAgo(88), geoStart: { lat: 49.5703, lng: 15.9551 }, geoAccuracy: 18 } },
+  { uid: 'u_hajek', displayName: 'Tomáš Hájek', initials: 'TH', role: 'worker', phone: '+420 724 889 010', hourlyCost: 420, active: true, activeTimer: { logId: 'tl_903', jobId: 'job_0145', startedAt: minutesAgo(130), geoStart: { lat: 49.56122, lng: 16.07455 }, geoAccuracy: 25 } },
   { uid: 'u_benes', displayName: 'Lukáš Beneš', initials: 'LB', role: 'worker', phone: '+420 608 300 765', hourlyCost: 340, active: true, activeTimer: null },
   { uid: 'u_svoboda', displayName: 'Ondřej Svoboda', initials: 'OS', role: 'manager', phone: '+420 777 610 482', hourlyCost: 450, active: true, activeTimer: null },
 ];
@@ -370,6 +370,15 @@ export const mockQuotes: Quote[] = [
  * Ukázkové docházky za aktuální měsíc (pracovní dny před dneškem), aby mzdové podklady
  * nebyly prázdné. Generují se relativně k dnešku.
  */
+const SEED_SITES: Record<string, { lat: number; lng: number }> = { job_0142: { lat: 49.5626, lng: 15.9392 }, job_0145: { lat: 49.5614, lng: 16.0742 } };
+/** Poloha při začátku práce: na stavbě s drobnou odchylkou, jednou za čas „z benzinky“ 2 km vedle. */
+function seedGeo(jobId: string, day: number, i: number) {
+  const site = SEED_SITES[jobId];
+  if (!site) return null;
+  if ((day + i) % 11 === 3) return { lat: site.lat + 0.012, lng: site.lng + 0.021 };
+  return { lat: site.lat + (((day * 13 + i * 7) % 9) - 4) * 0.00008, lng: site.lng + (((day * 5 + i * 3) % 9) - 4) * 0.00011 };
+}
+
 function seedTimeLogs(): { logs: TimeLog[]; confirmed: Record<string, Date> } {
   const crews: Array<[string, string, number]> = [
     ['u_dvorak', 'job_0142', 380], ['u_kral', 'job_0142', 360], ['u_hajek', 'job_0145', 420], ['u_benes', 'job_0145', 340], ['u_svoboda', 'job_0139', 450],
@@ -385,7 +394,7 @@ function seedTimeLogs(): { logs: TimeLog[]; confirmed: Record<string, Date> } {
       const start = new Date(date); start.setHours(7, 0 + i * 5, 0, 0);
       const minutes = 450 + ((day * 7 + i * 11) % 60); // 7,5–8,5 h
       const end = new Date(start.getTime() + (minutes + 30) * 60_000);
-      logs.push({ id: `tl_seed_${uid}_${day}`, jobId, workerId: uid, startedAt: start, endedAt: end, durationMin: minutes, costSnapshot: Math.round((minutes / 60) * cost), geoStart: null, breakMin: 30 });
+      logs.push({ id: `tl_seed_${uid}_${day}`, jobId, workerId: uid, startedAt: start, endedAt: end, durationMin: minutes, costSnapshot: Math.round((minutes / 60) * cost), geoStart: seedGeo(jobId, day, i), geoAccuracy: 15, breakMin: 30 });
       if (today.getDate() - day > 2) confirmed[`${uid}_${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`] = end;
     });
   }

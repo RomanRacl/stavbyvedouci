@@ -84,6 +84,10 @@ export interface ActiveTimer {
   pausedMs?: number;
   /** Etapa zakázky, na které se právě pracuje. */
   stageId?: string | null;
+  /** Poloha telefonu při začátku práce (doplní se pár vteřin po startu). */
+  geoStart?: GeoPoint | null;
+  /** Přesnost polohy v metrech. */
+  geoAccuracy?: number | null;
 }
 
 export interface Member {
@@ -317,6 +321,8 @@ export interface TimeLog {
   durationMin: number | null; // dopočítá Cloud Function po ukončení
   costSnapshot: number | null; // durationMin/60 * hourlyCost v daný okamžik
   geoStart: GeoPoint | null;
+  /** Přesnost polohy při začátku v metrech. */
+  geoAccuracy?: number | null;
   breakMin?: number;
   stageId?: string | null;
 }
@@ -481,6 +487,12 @@ export interface CompanySettings {
   kmRate?: number;
   /** Roční cíle firmy. */
   goals?: Goals;
+  /** Uložit polohu telefonu při začátku práce (výchozí ano). */
+  geoCheckIn?: boolean;
+  /** Do jaké vzdálenosti od stavby se začátek práce bere jako „na místě“ (m). */
+  siteRadiusM?: number;
+  /** Razítko s kódem zakázky, datem a polohou do fotek z mobilu (výchozí ano). */
+  photoStamp?: boolean;
 }
 
 export interface Goals {
