@@ -2,11 +2,13 @@
 
 import { MotionConfig } from 'framer-motion';
 import { useEffect, type ReactNode } from 'react';
+import { installErrorHandlers } from '@/lib/monitoring';
 
 /** Klientské providery na jednom místě (MotionConfig, později AuthProvider, QueryClient…). */
 export function Providers({ children }: { children: ReactNode }) {
   // Service worker jen v produkci – při vývoji by cache překážela.
   useEffect(() => {
+    installErrorHandlers();
     if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => undefined);
     }
