@@ -72,12 +72,13 @@ import {
   mockReservations,
   mockAbsences,
   mockSubcontractors,
+  loadTestJobs,
 } from './dashboard.mock';
 import { describeChanges } from '@/lib/audit';
 import { clientKey as clientKeyOf, progressFromStages, safetyOf } from '@/lib/operations';
 import { activeTier, invoiceBasis, itemsForTier, quoteHours, quoteTotals } from '@/lib/money';
 import { nextDocNumber } from '@/lib/finance';
-import { readStore, updateStore, type Stored } from './localStore';
+import { readStore, storeVersion, updateStore, type Stored } from './localStore';
 
 /**
  * „Server“ pro režim bez Firebase. Každá funkce odpovídá budoucí operaci ve Firestore
@@ -118,7 +119,7 @@ export interface Snapshot {
 const newId = (prefix: string) => `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 function build(s: Stored): Snapshot {
-  const jobs = [...s.created, ...mockJobs, ...mockHistoryJobs]
+  const jobs = [...s.created, ...mockJobs, ...mockHistoryJobs, ...(s.loadTest ? loadTestJobs(s.loadTest) : [])]
     .filter((j) => !s.deleted.includes(j.id))
     .map((j) => (s.patches[j.id] ? { ...j, ...s.patches[j.id] } : j));
   const members = mockMembers.map((m) => (m.uid in s.timers ? { ...m, activeTimer: s.timers[m.uid] } : m));
@@ -173,7 +174,21 @@ function logIn(s: Stored, jobId: string | null, kind: AuditKind, text: string, b
   return { ...s, audit: [...s.audit, entry] };
 }
 
-export const getSnapshot = (): Snapshot => build(readStore());
+/**
+ * Snímek se drží v paměti, dokud se data nezmění: všechny komponenty na stránce
+ * pak sdílejí jeden výpočet místo opakovaného čtení a skládání dat.
+ */
+let cached: { version: number; snap: Snapshot } | null = null;
+export const getSnapshot = (): Snapshot => {
+  const v = storeVersion();
+  if (!cached || cached.version !== v) cached = { version: v, snap: build(readStore()) };
+  return cached.snap;
+};
+
+/** Zátěžový test: přidá N smyšlených zakázek (0 = vypnout). */
+export function setLoadTest(n: number) {
+  updateStore((s) => ({ ...s, loadTest: n }));
+}
 
 /** Úprava zakázky – nové zakázky se mění na místě, ukázkové přes patch. */
 function patchIn(s: Stored, jobId: string, patch: Partial<Job>): Stored {

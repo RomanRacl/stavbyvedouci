@@ -428,14 +428,14 @@ const CREWS: Array<{ ids: string[]; speed: number; trades: Job['trade'][] }> = [
 const CLIENTS = ['Rodina Novotných', 'Ing. Pavel Dušek', 'SVJ Zahradní 12', 'Marie Veselá', 'Pekárna U Mlýna', 'Obec Jámy', 'Petr a Eva Horákovi', 'Autoservis Kubát', 'Mgr. Lenka Malá', 'Bytové družstvo Vysočina'];
 const TOWNS = ['Žďár nad Sázavou', 'Nové Město na Moravě', 'Bystřice nad Pernštejnem', 'Velké Meziříčí', 'Svratka'];
 
-function historyJobs(): Job[] {
-  const r = rng(20261030);
+function historyJobs(count = 30, seed = 20261030, prefix = 'h', codeFrom = 80): Job[] {
+  const r = rng(seed);
   const pick = <T,>(a: T[]) => a[Math.floor(r() * a.length)];
   const between = (a: number, b: number) => a + r() * (b - a);
   const now = Date.now();
   const day = 86_400_000;
   const out: Job[] = [];
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < count; i++) {
     const crew = pick(CREWS);
     const trade = pick(crew.trades);
     const budgetHours = Math.round(between(24, 150));
@@ -445,7 +445,7 @@ function historyJobs(): Job[] {
     const actualHours = Math.round(budgetHours * (TRADE_OVERRUN[trade] / crew.speed) * between(0.9, 1.12));
     const materialFactor = trade === 'construction' ? between(1.0, 1.2) : between(0.94, 1.1);
     const actualMaterial = Math.round(materialBudget * materialFactor);
-    const start = new Date(now - between(25, 185) * day);
+    const start = new Date(now - between(25, prefix === 'h' ? 185 : 720) * day);
     start.setHours(7, 0, 0, 0);
     const plannedDays = Math.max(3, Math.round(budgetHours / (8 * crew.ids.length)) + 2);
     const due = new Date(start.getTime() + plannedDays * day);
@@ -469,9 +469,9 @@ function historyJobs(): Job[] {
       construction: ['mat_obklad', 'mat_lepidlo'],
       hvac: ['mat_cu', 'mat_izol32'],
     };
-    const code = `Z-2026-${String(80 + i).padStart(4, '0')}`;
+    const code = prefix === 'h' ? `Z-2026-${String(codeFrom + i).padStart(4, '0')}` : `Z-${start.getFullYear()}-${String(codeFrom + i).padStart(5, '0')}`;
     out.push({
-      id: `job_h${i}`,
+      id: `job_${prefix}${i}`,
       code,
       title: pick(HISTORY_TITLES[trade]),
       trade,
@@ -489,7 +489,7 @@ function historyJobs(): Job[] {
       vatMode,
       payments: [
         {
-          id: `pay_h${i}`,
+          id: `pay_${prefix}${i}`,
           label: 'Úhrada faktury',
           amount: gross,
           dueDate,
@@ -497,7 +497,7 @@ function historyJobs(): Job[] {
           paidAt,
         },
       ],
-      invoice: { number: `PF-${start.getFullYear()}-${String(i + 1).padStart(4, '0')}`, issuedAt, taxDate: handoverAt, dueDate, paidAt, reminders: [] },
+      invoice: { number: prefix === 'h' ? `PF-${start.getFullYear()}-${String(i + 1).padStart(4, '0')}` : `PF-T${String(i + 1).padStart(5, '0')}`, issuedAt, taxDate: handoverAt, dueDate, paidAt, reminders: [] },
       approval: { approvedBy: 'u_owner', approvedAt: new Date(handoverAt.getTime() + day) },
       createdAt: new Date(start.getTime() - 10 * day),
       updatedAt: issuedAt,
@@ -507,6 +507,13 @@ function historyJobs(): Job[] {
 }
 
 export const mockHistoryJobs = historyJobs();
+
+/** Zátěžová data: tisíce smyšlených dokončených zakázek za 2 roky (jen pro test rychlosti). */
+const loadCache = new Map<number, Job[]>();
+export function loadTestJobs(n: number): Job[] {
+  if (!loadCache.has(n)) loadCache.set(n, historyJobs(n, 777, 't', 1));
+  return loadCache.get(n)!;
+}
 
 /* ---------- fáze 5: provoz ---------- */
 

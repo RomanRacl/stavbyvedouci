@@ -64,6 +64,8 @@ export interface Stored {
   reservations: Reservation[] | null;
   absences: Absence[] | null;
   subcontractors: Subcontractor[] | null;
+  /** Počet zátěžových zakázek (test rychlosti), 0 = vypnuto. */
+  loadTest: number;
 }
 
 const EMPTY: Stored = {
@@ -95,6 +97,7 @@ const EMPTY: Stored = {
   reservations: null,
   absences: null,
   subcontractors: null,
+  loadTest: 0,
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
@@ -110,8 +113,18 @@ export function readStore(): Stored {
   return { ...EMPTY };
 }
 
+/** Verze dat – roste s každou změnou; podle ní se drží v paměti hotový snímek. */
+let version = 0;
+export const storeVersion = () => version;
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === KEY) version++;
+  });
+}
+
 /** Atomická úprava + oznámení ostatním částem aplikace v této záložce. */
 export function updateStore(fn: (s: Stored) => Stored) {
+  version++;
   const next = fn(readStore());
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
@@ -133,6 +146,7 @@ export function subscribeStore(cb: () => void): () => void {
 }
 
 export function resetStore() {
+  version++;
   try {
     localStorage.removeItem(KEY);
   } catch {

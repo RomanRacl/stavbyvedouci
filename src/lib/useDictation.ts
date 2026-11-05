@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { speechLang, t } from '@/lib/i18n';
 
 interface RecognitionLike {
   lang: string;
@@ -42,7 +43,7 @@ export function useDictation(onText: (text: string) => void) {
     if (!C) return;
     setError(null);
     const r = new C();
-    r.lang = 'cs-CZ';
+    r.lang = speechLang();
     r.continuous = true;
     r.interimResults = false;
     r.onresult = (e) => {
@@ -51,7 +52,7 @@ export function useDictation(onText: (text: string) => void) {
         if (res.isFinal) cb.current(res[0].transcript.trim());
       }
     };
-    r.onerror = (e) => setError(e.error === 'not-allowed' ? 'Povolte mikrofon v nastavení prohlížeče.' : 'Diktování se přerušilo, zkuste to znovu.');
+    r.onerror = (e) => setError(e.error === 'not-allowed' ? t('Povolte mikrofon v nastavení prohlížeče.') : t('Diktování se přerušilo, zkuste to znovu.'));
     r.onend = () => setListening(false);
     rec.current = r;
     r.start();
