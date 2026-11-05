@@ -315,7 +315,7 @@ export function JobDetail({
               >
                 {t.label}
                 {t.badge && (
-                  <span className={`rounded-full px-1.5 text-xs tabular-nums ${alert ? 'bg-warn text-white' : 'bg-concrete text-ink-2'}`}>{t.badge}</span>
+                  <span className={`rounded-full px-1.5 text-xs tabular-nums ${alert ? 'bg-warn text-[#16202a]' : 'bg-concrete text-ink-2'}`}>{t.badge}</span>
                 )}
                 {active && <motion.span layoutId={`tab-${job.id}`} className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-ink" />}
               </button>

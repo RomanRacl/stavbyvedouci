@@ -1,6 +1,7 @@
 'use client';
 
 import { AlertTriangle, Check } from 'lucide-react';
+import { t } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { SignaturePad } from '@/components/ui/SignaturePad';
@@ -39,7 +40,7 @@ export function HandoverSheet({ job, photoCount, open, onClose, onSubmit }: Prop
     <BottomSheet
       open={open}
       onClose={onClose}
-      title="Předat hotovou práci"
+      title={t('Předat hotovou práci')}
       footer={
         <button
           type="button"
@@ -47,7 +48,7 @@ export function HandoverSheet({ job, photoCount, open, onClose, onSubmit }: Prop
           onClick={() => onSubmit({ clientName: absent ? '' : clientName.trim(), signature: absent ? null : signature })}
           className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-good text-base font-semibold text-white transition active:scale-[0.98] disabled:bg-line disabled:text-ink-3"
         >
-          <Check className="size-5" /> Předat ke schválení
+          <Check className="size-5" /> {t('Předat ke schválení')}
         </button>
       }
     >
@@ -55,25 +56,25 @@ export function HandoverSheet({ job, photoCount, open, onClose, onSubmit }: Prop
         {missing.length > 0 ? (
           <div className="rounded-xl bg-crit/10 p-4 text-crit-ink">
             <p className="flex items-center gap-2 text-base font-semibold">
-              <AlertTriangle className="size-5" /> Chybí povinné body
+              <AlertTriangle className="size-5" /> {t('Chybí povinné body')}
             </p>
             <ul className="mt-2 list-disc space-y-1 pl-6 text-base">
               {missing.map((i) => (
                 <li key={i.id}>{i.text}</li>
               ))}
             </ul>
-            <p className="mt-2 text-sm">Odškrtněte je v kontrolním seznamu zakázky a pak předejte.</p>
+            <p className="mt-2 text-sm">{t('Odškrtněte je v kontrolním seznamu zakázky a pak předejte.')}</p>
           </div>
         ) : (
           <p className="flex items-center gap-2 rounded-xl bg-good/10 p-3 text-base text-good-ink">
-            <Check className="size-5" /> Kontrolní seznam je hotový{photoCount ? `, ${photoCount} fotek` : ''}.
+            <Check className="size-5" /> {photoCount ? t('Kontrolní seznam je hotový, {n} fotek.', { n: photoCount }) : t('Kontrolní seznam je hotový.')}
           </p>
         )}
 
         {!absent && (
           <>
             <label className="block">
-              <span className="mb-1.5 block text-base font-medium text-ink">Kdo práci převzal</span>
+              <span className="mb-1.5 block text-base font-medium text-ink">{t('Kdo práci převzal')}</span>
               <input
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
@@ -81,7 +82,7 @@ export function HandoverSheet({ job, photoCount, open, onClose, onSubmit }: Prop
               />
             </label>
             <div>
-              <span className="mb-1.5 block text-base font-medium text-ink">Podpis zákazníka</span>
+              <span className="mb-1.5 block text-base font-medium text-ink">{t('Podpis zákazníka')}</span>
               <SignaturePad onChange={setSignature} />
             </div>
           </>
@@ -89,7 +90,7 @@ export function HandoverSheet({ job, photoCount, open, onClose, onSubmit }: Prop
 
         <label className="flex min-h-12 items-center gap-3 text-base text-ink">
           <input type="checkbox" checked={absent} onChange={(e) => setAbsent(e.target.checked)} className="size-6 accent-ink" />
-          Zákazník není na místě, předat bez podpisu
+          {t('Zákazník není na místě, předat bez podpisu')}
         </label>
       </div>
     </BottomSheet>

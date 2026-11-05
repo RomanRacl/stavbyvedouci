@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Trash2, X } from 'lucide-react';
+import { localeOf, t, t as tr } from '@/lib/i18n';
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PHOTO_TAGS } from '@/lib/jobDefaults';
@@ -55,7 +56,7 @@ export function PhotoViewer({ photos, index, members, onIndex, canDelete, onDele
   }, [index, photos.length, onIndex]);
 
   if (typeof document === 'undefined') return null;
-  const author = photo ? members.find((m) => m.uid === photo.workerId)?.displayName ?? 'Neznámý pracovník' : '';
+  const author = photo ? members.find((m) => m.uid === photo.workerId)?.displayName ?? t('Neznámý pracovník') : '';
   const deletable = photo && onDelete && canDelete?.(photo);
 
   return createPortal(
@@ -68,14 +69,14 @@ export function PhotoViewer({ photos, index, members, onIndex, canDelete, onDele
           exit={{ opacity: 0 }}
           role="dialog"
           aria-modal="true"
-          aria-label="Fotka ze zakázky"
+          aria-label={t('Fotka ze zakázky')}
         >
           <header className="flex items-center gap-3 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-[15px] font-medium">{author}</p>
               <p className="text-sm text-[#fff]/60 tabular-nums">
-                {photo.takenAt.toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                {photos.length > 1 && `, ${index + 1} z ${photos.length}`}
+                {photo.takenAt.toLocaleString(localeOf(), { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {photos.length > 1 && `, ${t('{a} z {b}', { a: index + 1, b: photos.length })}`}
               </p>
             </div>
             {deletable &&
@@ -88,14 +89,14 @@ export function PhotoViewer({ photos, index, members, onIndex, canDelete, onDele
                   }}
                   className="h-11 rounded-xl bg-crit px-4 text-sm font-semibold"
                 >
-                  Opravdu smazat
+                  {t('Opravdu smazat')}
                 </button>
               ) : (
-                <button type="button" onClick={() => setConfirm(true)} aria-label="Smazat fotku" className="grid size-11 place-items-center rounded-xl hover:bg-[#fff]/10">
+                <button type="button" onClick={() => setConfirm(true)} aria-label={t('Smazat fotku')} className="grid size-11 place-items-center rounded-xl hover:bg-[#fff]/10">
                   <Trash2 className="size-5" />
                 </button>
               ))}
-            <button type="button" onClick={() => onIndex(null)} aria-label="Zavřít" className="grid size-11 place-items-center rounded-xl hover:bg-[#fff]/10">
+            <button type="button" onClick={() => onIndex(null)} aria-label={t('Zavřít')} className="grid size-11 place-items-center rounded-xl hover:bg-[#fff]/10">
               <X className="size-6" />
             </button>
           </header>
@@ -123,12 +124,12 @@ export function PhotoViewer({ photos, index, members, onIndex, canDelete, onDele
             </AnimatePresence>
 
             {index > 0 && (
-              <button type="button" onClick={() => go(-1)} aria-label="Předchozí fotka" className="absolute top-1/2 left-2 hidden size-12 -translate-y-1/2 place-items-center rounded-full bg-black/50 hover:bg-black/70 sm:grid">
+              <button type="button" onClick={() => go(-1)} aria-label={t('Předchozí fotka')} className="absolute top-1/2 left-2 hidden size-12 -translate-y-1/2 place-items-center rounded-full bg-black/50 hover:bg-black/70 sm:grid">
                 <ChevronLeft className="size-6" />
               </button>
             )}
             {index < photos.length - 1 && (
-              <button type="button" onClick={() => go(1)} aria-label="Další fotka" className="absolute top-1/2 right-2 hidden size-12 -translate-y-1/2 place-items-center rounded-full bg-black/50 hover:bg-black/70 sm:grid">
+              <button type="button" onClick={() => go(1)} aria-label={t('Další fotka')} className="absolute top-1/2 right-2 hidden size-12 -translate-y-1/2 place-items-center rounded-full bg-black/50 hover:bg-black/70 sm:grid">
                 <ChevronRight className="size-6" />
               </button>
             )}
@@ -147,12 +148,12 @@ export function PhotoViewer({ photos, index, members, onIndex, canDelete, onDele
                         active ? (t.id === 'defect' ? 'bg-crit text-[#fff]' : 'bg-[#fff] text-[#16202a]') : 'bg-[#fff]/10 text-[#fff]/80 hover:bg-[#fff]/20'
                       }`}
                     >
-                      {t.label}
+                      {tr(t.label)}
                     </button>
                   );
                 })
               : photo.tag && (
-                  <span className="rounded-full bg-[#fff]/15 px-3 py-1 text-sm">{PHOTO_TAGS.find((t) => t.id === photo.tag)?.label}</span>
+                  <span className="rounded-full bg-[#fff]/15 px-3 py-1 text-sm">{tr(PHOTO_TAGS.find((x) => x.id === photo.tag)?.label ?? '')}</span>
                 )}
           </div>
         </motion.div>

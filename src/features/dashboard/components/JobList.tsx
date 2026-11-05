@@ -4,7 +4,7 @@ import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import { Check, ListChecks, Search, TrendingDown, Wrench, X } from 'lucide-react';
 import { bulkAssign, bulkDelete, bulkShift, bulkStatus } from '@/lib/mock/localBackend';
 import { useSnapshot } from '@/lib/mock/useSnapshot';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { fmt, jobFinancials } from '@/features/analytics/lib/metrics';
 import { extraWorkOf } from '@/lib/jobDefaults';
@@ -43,6 +43,18 @@ export function JobList({ jobs, selectedId, onSelect, onToast }: Props) {
   const [bulk, setBulk] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [confirmDel, setConfirmDel] = useState(false);
+  /* Vykresluje se jen prvních N řádků, další se dočtou při posunu dolů – seznam zůstane plynulý i s tisíci zakázek. */
+  const PAGE = 60;
+  const [limit, setLimit] = useState(PAGE);
+  const sentinel = useRef<HTMLLIElement>(null);
+  useEffect(() => setLimit(PAGE), [filter, q]);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && setLimit((l) => l + PAGE), { rootMargin: '400px' });
+    io.observe(el);
+    return () => io.disconnect();
+  });
   const snap = useSnapshot();
   const workers = (snap?.members ?? []).filter((m) => m.role !== 'owner');
   const toggle = (id: string) =>
@@ -142,7 +154,7 @@ export function JobList({ jobs, selectedId, onSelect, onToast }: Props) {
               Žádná zakázka neodpovídá filtru. Zkuste jiný stav nebo vymažte hledání.
             </li>
           )}
-          {visible.map((job) => {
+          {visible.slice(0, limit).map((job) => {
             const f = jobFinancials(job);
             const selected = job.id === selectedId;
             const losing = f.forecastMarginPct < 0;
@@ -211,6 +223,13 @@ export function JobList({ jobs, selectedId, onSelect, onToast }: Props) {
               </motion.li>
             );
           })}
+          {visible.length > limit && (
+            <li ref={sentinel} className="px-3 py-3 text-center">
+              <button type="button" onClick={() => setLimit((l) => l + PAGE)} className="text-sm font-medium text-series-1-ink underline-offset-4 hover:underline">
+                Zobrazit dalších {Math.min(PAGE, visible.length - limit)} z {visible.length - limit}
+              </button>
+            </li>
+          )}
         </ul>
       </LayoutGroup>
       <AnimatePresence>

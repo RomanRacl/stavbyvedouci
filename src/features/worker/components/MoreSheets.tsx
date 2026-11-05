@@ -6,7 +6,8 @@ import { BarcodeScanner } from '@/components/ui/BarcodeScanner';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { fmt } from '@/features/analytics/lib/metrics';
 import { addTrip, requestAbsence, toolIn, toolOut, type Snapshot } from '@/lib/mock/localBackend';
-import { monthKey, monthLabel } from '@/lib/money';
+import { monthKey } from '@/lib/money';
+import { localeOf, t } from '@/lib/i18n';
 import { ABSENCE_KINDS, absenceWorkdays, bonusesForMonth, lastOdometer, payslip, toolStates } from '@/lib/people';
 import type { AbsenceKind, Member } from '@/types/firestore';
 import { buzz } from '../hooks/useWorkerData';
@@ -19,15 +20,15 @@ const toInputDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).
 /** Dlaždice „Další“ na hlavní obrazovce dělníka. */
 export function MoreTiles({ onOpen, badge }: { onOpen: (k: MoreKind) => void; badge: Partial<Record<MoreKind, number>> }) {
   const tiles: Array<{ k: MoreKind; label: string; Icon: typeof Car }> = [
-    { k: 'trip', label: 'Kniha jízd', Icon: Car },
-    { k: 'tools', label: 'Nářadí', Icon: Wrench },
-    { k: 'absence', label: 'Volno a nemoc', Icon: Sun },
-    { k: 'earnings', label: 'Můj výdělek', Icon: Wallet },
+    { k: 'trip', label: t('Kniha jízd'), Icon: Car },
+    { k: 'tools', label: t('Nářadí'), Icon: Wrench },
+    { k: 'absence', label: t('Volno a nemoc'), Icon: Sun },
+    { k: 'earnings', label: t('Můj výdělek'), Icon: Wallet },
   ];
   return (
     <section className="mt-8" aria-labelledby="more-h">
       <h2 id="more-h" className="text-base font-semibold text-ink">
-        Další
+        {t('Další')}
       </h2>
       <ul className="mt-3 grid grid-cols-2 gap-3">
         {tiles.map(({ k, label, Icon }) => (
@@ -79,7 +80,7 @@ function TripSheet({ open, onClose, snap, me, say }: SheetProps) {
     <BottomSheet
       open={open === 'trip'}
       onClose={onClose}
-      title={`Kniha jízd: ${myVan.name} ${myVan.plate}`}
+      title={`${t('Kniha jízd')}: ${myVan.name} ${myVan.plate}`}
       footer={
         <button
           type="button"
@@ -87,22 +88,22 @@ function TripSheet({ open, onClose, snap, me, say }: SheetProps) {
           onClick={() => {
             addTrip({ vanId: myVan.id, driverId: me.uid, date: new Date(), kmStart: start, kmEnd: Number(end), purpose: 'Sklad – stavba – sklad', jobId: job || null });
             buzz();
-            say(`Zapsáno ${km} km.`);
+            say(t('Zapsáno {km} km.', { km }));
             setEnd('');
             onClose();
           }}
           className={BIG}
         >
-          Zapsat {km > 0 ? `${km} km` : 'jízdu'}
+          {km > 0 ? t('Zapsat {km} km', { km }) : t('Zapsat jízdu')}
         </button>
       }
     >
       <div className="space-y-4 pb-4">
         <p className="text-base text-ink-2">
-          Tachometr při odjezdu: <strong className="text-ink tabular-nums">{start.toLocaleString('cs-CZ')} km</strong>
+          {t('Tachometr při odjezdu:')} <strong className="text-ink tabular-nums">{start.toLocaleString(localeOf())} km</strong>
         </p>
         <label className="block">
-          <span className="mb-1.5 block text-base font-medium text-ink">Stav tachometru teď</span>
+          <span className="mb-1.5 block text-base font-medium text-ink">{t('Stav tachometru teď')}</span>
           <input
             inputMode="numeric"
             value={end}
@@ -111,10 +112,10 @@ function TripSheet({ open, onClose, snap, me, say }: SheetProps) {
             className="block h-14 w-full rounded-xl border border-line bg-surface px-4 text-right font-display text-2xl font-semibold text-ink tabular-nums focus:border-series-1 focus:outline-none"
           />
         </label>
-        {end && km <= 0 && <p className="text-sm text-crit-ink">Stav musí být vyšší než {start.toLocaleString('cs-CZ')}.</p>}
+        {end && km <= 0 && <p className="text-sm text-crit-ink">{t('Stav musí být vyšší než {n}.', { n: start.toLocaleString(localeOf()) })}</p>}
         {myJobs.length > 0 && (
           <div>
-            <p className="mb-1.5 text-base font-medium text-ink">Kam</p>
+            <p className="mb-1.5 text-base font-medium text-ink">{t('Kam')}</p>
             <div className="grid gap-2">
               {myJobs.map((j) => (
                 <button
@@ -133,10 +134,10 @@ function TripSheet({ open, onClose, snap, me, say }: SheetProps) {
         )}
         {mine.length > 0 && (
           <ul className="text-sm text-ink-2">
-            {mine.map((t) => (
-              <li key={t.id} className="flex justify-between border-t border-line py-1.5">
-                <span>{t.date.toLocaleDateString('cs-CZ')}</span>
-                <span className="tabular-nums">{t.kmEnd - t.kmStart} km</span>
+            {mine.map((trip) => (
+              <li key={trip.id} className="flex justify-between border-t border-line py-1.5">
+                <span>{trip.date.toLocaleDateString(localeOf())}</span>
+                <span className="tabular-nums">{trip.kmEnd - trip.kmStart} km</span>
               </li>
             ))}
           </ul>
@@ -159,29 +160,29 @@ function ToolsSheet({ open, onClose, snap, me, say }: SheetProps) {
   const take = (toolId: string) => {
     toolOut(me.uid, toolId, me.uid, job?.id ?? null);
     buzz();
-    say(`Máte u sebe: ${snap.tools.find((t) => t.id === toolId)?.name}.`);
+    say(t('Máte u sebe: {name}.', { name: snap.tools.find((x) => x.id === toolId)?.name ?? '' }));
   };
   const give = (toolId: string) => {
     toolIn(me.uid, toolId);
     buzz();
-    say('Vráceno do skladu.');
+    say(t('Vráceno do skladu.'));
   };
 
   return (
     <BottomSheet
       open={open === 'tools'}
       onClose={onClose}
-      title="Nářadí"
+      title={t('Nářadí')}
       footer={
         <button type="button" onClick={() => setScan(true)} className={BIG}>
-          <ScanLine className="size-5" /> Naskenovat QR štítek
+          <ScanLine className="size-5" /> {t('Naskenovat QR štítek')}
         </button>
       }
     >
       <div className="space-y-4 pb-4">
-        <p className="text-base font-medium text-ink">Mám u sebe ({mine.length})</p>
+        <p className="text-base font-medium text-ink">{t('Mám u sebe ({n})', { n: mine.length })}</p>
         {mine.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-line px-4 py-4 text-center text-base text-ink-2">Nic. Nářadí si vezmete naskenováním štítku.</p>
+          <p className="rounded-xl border border-dashed border-line px-4 py-4 text-center text-base text-ink-2">{t('Nic. Nářadí si vezmete naskenováním štítku.')}</p>
         ) : (
           <ul className="space-y-2">
             {mine.map((s) => (
@@ -189,19 +190,19 @@ function ToolsSheet({ open, onClose, snap, me, say }: SheetProps) {
                 <span className="min-w-0 flex-1">
                   <span className="block text-base text-ink">{s.tool.name}</span>
                   <span className="block text-sm text-ink-3">
-                    {s.tool.code}, od {s.since!.toLocaleDateString('cs-CZ')}
-                    {s.revision === 'overdue' && ', prošlá revize!'}
+                    {s.tool.code}, {t('od {d}', { d: s.since!.toLocaleDateString(localeOf()) })}
+                    {s.revision === 'overdue' && t(', prošlá revize!')}
                   </span>
                 </span>
                 <button type="button" onClick={() => give(s.tool.id)} className="flex h-12 items-center gap-1.5 rounded-xl border border-line px-3 text-base font-medium text-ink active:bg-concrete">
-                  <ArrowDownToLine className="size-5" /> Vrátit
+                  <ArrowDownToLine className="size-5" /> {t('Vrátit')}
                 </button>
               </li>
             ))}
           </ul>
         )}
         <button type="button" onClick={() => setShowFree((v) => !v)} className="text-base font-medium text-series-1-ink underline underline-offset-4">
-          {showFree ? 'Skrýt volné nářadí' : `Volné nářadí ve skladu (${free.length})`}
+          {showFree ? t('Skrýt volné nářadí') : t('Volné nářadí ve skladu ({n})', { n: free.length })}
         </button>
         {showFree && (
           <ul className="space-y-2">
@@ -209,7 +210,7 @@ function ToolsSheet({ open, onClose, snap, me, say }: SheetProps) {
               <li key={s.tool.id} className="flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3">
                 <span className="min-w-0 flex-1 text-base text-ink">{s.tool.name}</span>
                 <button type="button" onClick={() => take(s.tool.id)} className="flex h-12 items-center gap-1.5 rounded-xl bg-ink px-3 text-base font-medium text-white">
-                  <ArrowUpFromLine className="size-5" /> Vzít
+                  <ArrowUpFromLine className="size-5" /> {t('Vzít')}
                 </button>
               </li>
             ))}
@@ -217,7 +218,7 @@ function ToolsSheet({ open, onClose, snap, me, say }: SheetProps) {
         )}
         {states.filter((s) => s.holderId && s.holderId !== me.uid).length > 0 && (
           <p className="text-sm text-ink-3">
-            U ostatních:{' '}
+            {t('U ostatních:')}{' '}
             {states
               .filter((s) => s.holderId && s.holderId !== me.uid)
               .map((s) => `${s.tool.name} (${snap.members.find((m) => m.uid === s.holderId)?.displayName.split(' ')[0]})`)
@@ -226,6 +227,7 @@ function ToolsSheet({ open, onClose, snap, me, say }: SheetProps) {
         )}
       </div>
       <BarcodeScanner
+        kind="qr"
         open={scan}
         onClose={() => setScan(false)}
         onCode={(code) => {
@@ -263,13 +265,13 @@ function AbsenceSheet({ open, onClose, snap, me, say }: SheetProps) {
           onClick={() => {
             requestAbsence(me.uid, { kind, from: new Date(from), to: new Date(to), note });
             buzz();
-            say(kind === 'sick' ? 'Nemoc nahlášena kanceláři. Brzy se uzdravte.' : 'Žádost odeslána ke schválení.');
+            say(kind === 'sick' ? t('Nemoc nahlášena kanceláři. Brzy se uzdravte.') : t('Žádost odeslána ke schválení.'));
             setNote('');
             onClose();
           }}
           className={BIG}
         >
-          {kind === 'sick' ? 'Nahlásit nemoc' : `Požádat o ${days} ${days === 1 ? 'den' : days < 5 ? 'dny' : 'dní'}`}
+          {kind === 'sick' ? t('Nahlásit nemoc') : days === 1 ? t('Požádat o 1 den') : t('Požádat o {n} dní', { n: days })}
         </button>
       }
     >
@@ -283,40 +285,40 @@ function AbsenceSheet({ open, onClose, snap, me, say }: SheetProps) {
               onClick={() => {
                 setKind(k);
                 if (k === 'sick') {
-                  const t = toInputDate(new Date());
-                  setFrom(t);
-                  setTo(t);
+                  const today = toInputDate(new Date());
+                  setFrom(today);
+                  setTo(today);
                 }
               }}
               className={`h-12 rounded-xl border text-base font-medium ${kind === k ? 'border-ink bg-ink text-white' : 'border-line bg-surface text-ink'}`}
             >
-              {ABSENCE_KINDS[k].label}
+              {t(ABSENCE_KINDS[k].label)}
             </button>
           ))}
         </div>
         <div className="grid grid-cols-2 gap-2">
           <label className="text-base text-ink">
-            Od
+            {t('Od')}
             <input type="date" value={from} onChange={(e) => {
                 setFrom(e.target.value);
                 if (to < e.target.value) setTo(e.target.value);
               }} className="mt-1 block h-12 w-full rounded-xl border border-line bg-surface px-3 text-base" />
           </label>
           <label className="text-base text-ink">
-            Do
+            {t('Do')}
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="mt-1 block h-12 w-full rounded-xl border border-line bg-surface px-3 text-base" />
           </label>
         </div>
-        <input aria-label="Poznámka" placeholder="Poznámka pro kancelář (volitelně)" value={note} onChange={(e) => setNote(e.target.value)} className="block h-12 w-full rounded-xl border border-line bg-surface px-3 text-base" />
+        <input aria-label={t('Poznámka')} placeholder={t('Poznámka pro kancelář (volitelně)')} value={note} onChange={(e) => setNote(e.target.value)} className="block h-12 w-full rounded-xl border border-line bg-surface px-3 text-base" />
         {mine.length > 0 && (
           <ul className="space-y-2">
             {mine.map((a) => (
               <li key={a.id} className="flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-base">
                 <span className="min-w-0 flex-1">
-                  {ABSENCE_KINDS[a.kind].label} {a.from.toLocaleDateString('cs-CZ')}–{a.to.toLocaleDateString('cs-CZ')}
+                  {t(ABSENCE_KINDS[a.kind].label)} {a.from.toLocaleDateString(localeOf())}–{a.to.toLocaleDateString(localeOf())}
                 </span>
                 <span className={`text-sm font-medium ${a.status === 'approved' ? 'text-good-ink' : a.status === 'rejected' ? 'text-crit-ink' : 'text-warn-ink'}`}>
-                  {a.status === 'approved' ? 'schváleno' : a.status === 'rejected' ? 'zamítnuto' : 'čeká'}
+                  {a.status === 'approved' ? t('schváleno') : a.status === 'rejected' ? t('zamítnuto') : t('čeká')}
                 </span>
               </li>
             ))}
@@ -346,33 +348,33 @@ function EarningsSheet({ open, onClose, snap, me }: SheetProps) {
   );
 
   return (
-    <BottomSheet open={open === 'earnings'} onClose={onClose} title="Můj výdělek">
+    <BottomSheet open={open === 'earnings'} onClose={onClose} title={t('Můj výdělek')}>
       <div className="pb-6">
         <div className="mb-4 flex items-center justify-between">
-          <button type="button" aria-label="Předchozí měsíc" onClick={() => setOffset((o) => Math.min(5, o + 1))} className="grid size-12 place-items-center rounded-xl border border-line bg-surface">
+          <button type="button" aria-label={t('Předchozí měsíc')} onClick={() => setOffset((o) => Math.min(5, o + 1))} className="grid size-12 place-items-center rounded-xl border border-line bg-surface">
             <Minus className="size-5" />
           </button>
-          <p className="text-lg font-semibold capitalize text-ink">{monthLabel(month)}</p>
-          <button type="button" aria-label="Další měsíc" disabled={offset === 0} onClick={() => setOffset((o) => Math.max(0, o - 1))} className="grid size-12 place-items-center rounded-xl border border-line bg-surface disabled:opacity-40">
+          <p className="text-lg font-semibold capitalize text-ink">{d.toLocaleDateString(localeOf(), { month: 'long', year: 'numeric' })}</p>
+          <button type="button" aria-label={t('Další měsíc')} disabled={offset === 0} onClick={() => setOffset((o) => Math.max(0, o - 1))} className="grid size-12 place-items-center rounded-xl border border-line bg-surface disabled:opacity-40">
             <Plus className="size-5" />
           </button>
         </div>
         <div className="rounded-2xl bg-ink p-5 text-white">
-          <p className="text-sm text-[#c9d1d9]">Odhad čisté mzdy</p>
+          <p className="text-sm text-[#c9d1d9]">{t('Odhad čisté mzdy')}</p>
           <p className="font-display text-4xl font-bold tabular-nums">{fmt.czk(ps.net)}</p>
           <p className="mt-1 text-sm text-[#c9d1d9]">
-            {fmt.num(ps.hours)} h za {ps.days} dní
-            {offset === 0 && ', zatím za tento měsíc'}
+            {t('{h} h za {d} dní', { h: fmt.num(ps.hours), d: ps.days })}
+            {offset === 0 && t(', zatím za tento měsíc')}
           </p>
         </div>
         <dl className="mt-4 text-base">
-          {row(`Odpracováno ${fmt.num(ps.hours)} h × ${fmt.czk(ps.hourlyWage)}`, fmt.czk(ps.base))}
-          {ps.vacationDays + ps.sickDays > 0 && row(`Dovolená ${ps.vacationDays} dní, nemoc ${ps.sickDays} dní`, fmt.czk(ps.vacationPay))}
-          {row('Odměny za zakázky pod rozpočtem', fmt.czk(ps.bonus))}
-          {row('Hrubá mzda', fmt.czk(ps.gross), true)}
-          {row('Sociální a zdravotní pojištění', ps.social + ps.health ? `−${fmt.czk(ps.social + ps.health)}` : fmt.czk(0))}
-          {row('Záloha na daň (po slevě)', ps.tax ? `−${fmt.czk(ps.tax)}` : fmt.czk(0))}
-          {row('Čistá mzda (odhad)', fmt.czk(ps.net), true)}
+          {row(t('Odpracováno {h} h × {w}', { h: fmt.num(ps.hours), w: fmt.czk(ps.hourlyWage) }), fmt.czk(ps.base))}
+          {ps.vacationDays + ps.sickDays > 0 && row(t('Dovolená {v} dní, nemoc {s} dní', { v: ps.vacationDays, s: ps.sickDays }), fmt.czk(ps.vacationPay))}
+          {row(t('Odměny za zakázky pod rozpočtem'), fmt.czk(ps.bonus))}
+          {row(t('Hrubá mzda'), fmt.czk(ps.gross), true)}
+          {row(t('Sociální a zdravotní pojištění'), ps.social + ps.health ? `−${fmt.czk(ps.social + ps.health)}` : fmt.czk(0))}
+          {row(t('Záloha na daň (po slevě)'), ps.tax ? `−${fmt.czk(ps.tax)}` : fmt.czk(0))}
+          {row(t('Čistá mzda (odhad)'), fmt.czk(ps.net), true)}
         </dl>
         {bonuses.some((b) => b.split.some((x) => x.uid === me.uid)) && (
           <ul className="mt-4 space-y-1 text-sm text-ink-2">
@@ -380,12 +382,12 @@ function EarningsSheet({ open, onClose, snap, me }: SheetProps) {
               .filter((b) => b.split.some((x) => x.uid === me.uid))
               .map((b) => (
                 <li key={b.job.id}>
-                  {b.job.title}: ušetřeno {fmt.num(b.savedHours)} h, vaše odměna {fmt.czk(b.split.find((x) => x.uid === me.uid)!.amount)}
+                  {t('{job}: ušetřeno {h} h, vaše odměna {a}', { job: b.job.title, h: fmt.num(b.savedHours), a: fmt.czk(b.split.find((x) => x.uid === me.uid)!.amount) })}
                 </li>
               ))}
           </ul>
         )}
-        <p className="mt-4 text-sm text-ink-3">Orientační přehled z docházky v aplikaci. Skutečnou výplatu spočítá mzdová účetní, může se lišit například o slevy na děti.</p>
+        <p className="mt-4 text-sm text-ink-3">{t('Orientační přehled z docházky v aplikaci. Skutečnou výplatu spočítá mzdová účetní, může se lišit například o slevy na děti.')}</p>
       </div>
     </BottomSheet>
   );

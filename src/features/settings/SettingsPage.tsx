@@ -6,7 +6,8 @@ import type { ImportKind } from '@/lib/import/dataImport';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { btnPrimary, btnSecondary, inputCls, PageHeader } from '@/components/shell/PageHeader';
 import { Toast, type ToastMsg } from '@/components/ui/Toast';
-import { saveSettings } from '@/lib/mock/localBackend';
+import { saveSettings, setLoadTest } from '@/lib/mock/localBackend';
+import { readStore } from '@/lib/mock/localStore';
 import { resetStore } from '@/lib/mock/localStore';
 import { useSnapshot } from '@/lib/mock/useSnapshot';
 import { VAT_MODES } from '@/lib/money';
@@ -292,6 +293,23 @@ export default function SettingsPage() {
         </div>
       </section>
       <ImportDataDrawer kind={importing} snap={snap} onClose={() => setImporting(null)} onDone={(t) => { setImporting(null); setToast({ text: t, tone: 'success', id: Date.now() }); }} />
+
+      <section className="mt-8 rounded-xl border border-line bg-surface p-5">
+        <h2 className="text-base font-semibold text-ink">Zátěžový test</h2>
+        <p className="mt-1 text-sm text-ink-2">Přidá tisíce smyšlených dokončených zakázek, abyste viděli, jak aplikace zvládá velkou firmu. Data se neukládají, jen se dopočítají.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {[1000, 3000, 5000].map((n) => (
+            <button key={n} type="button" onClick={() => (setLoadTest(n), setToast({ text: `Přidáno ${n.toLocaleString('cs-CZ')} zátěžových zakázek.`, tone: 'success', id: Date.now() }))} className={btnSecondary}>
+              +{n.toLocaleString('cs-CZ')}
+            </button>
+          ))}
+          {readStore().loadTest > 0 && (
+            <button type="button" onClick={() => (setLoadTest(0), setToast({ text: 'Zátěžová data vypnuta.', tone: 'success', id: Date.now() }))} className="h-10 rounded-lg px-3 text-sm text-ink-2 hover:bg-concrete">
+              Vypnout ({readStore().loadTest.toLocaleString('cs-CZ')})
+            </button>
+          )}
+        </div>
+      </section>
 
       <section className="mt-8 rounded-xl border border-crit/30 bg-surface p-5">
         <h2 className="text-base font-semibold text-ink">Ukázková data</h2>

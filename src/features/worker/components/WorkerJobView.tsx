@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { ArrowLeft, Check, Clock3, Hammer, MapPin, Navigation, Package, Phone, Wrench } from 'lucide-react';
+import { localeOf, t } from '@/lib/i18n';
 import { useState } from 'react';
 import { fmt } from '@/features/analytics/lib/metrics';
 import { NotesThread } from '@/features/notes/NotesThread';
@@ -42,9 +43,9 @@ interface Props {
 }
 
 const EXTRA_STATUS = {
-  pending: { label: 'Čeká na schválení', cls: 'bg-warn/12 text-warn-ink' },
-  approved: { label: 'Schváleno', cls: 'bg-good/12 text-good-ink' },
-  rejected: { label: 'Zamítnuto', cls: 'bg-concrete text-ink-3' },
+  pending: { label: () => t('Čeká na schválení'), cls: 'bg-warn/12 text-warn-ink' },
+  approved: { label: () => t('Schváleno'), cls: 'bg-good/12 text-good-ink' },
+  rejected: { label: () => t('Zamítnuto'), cls: 'bg-concrete text-ink-3' },
 } as const;
 
 function SectionTitle({ id, children, aside }: { id: string; children: string; aside?: string }) {
@@ -83,7 +84,7 @@ export function WorkerJobView(p: Props) {
     >
       <div className="mx-auto max-w-md px-4 pt-4 pb-28">
         <button type="button" onClick={p.onBack} className="-ml-2 flex h-12 items-center gap-1.5 rounded-xl px-2 text-base font-medium text-ink-2 active:bg-surface">
-          <ArrowLeft className="size-5" /> Moje zakázky
+          <ArrowLeft className="size-5" /> {t('Moje zakázky')}
         </button>
 
         <header className="mt-2">
@@ -101,7 +102,7 @@ export function WorkerJobView(p: Props) {
             rel="noreferrer"
             className="flex h-12 items-center justify-center gap-2 rounded-xl border border-line bg-surface text-base font-medium text-ink active:bg-concrete"
           >
-            <Navigation className="size-4" /> Navigovat (Mapy.cz)
+            <Navigation className="size-4" /> {t('Navigovat (Mapy.cz)')}
           </a>
           <a
             href={job.client.phone ? `tel:${job.client.phone.replace(/\s/g, '')}` : undefined}
@@ -110,7 +111,7 @@ export function WorkerJobView(p: Props) {
               job.client.phone ? 'text-ink' : 'pointer-events-none text-ink-3'
             }`}
           >
-            <Phone className="size-4" /> Zavolat klientovi
+            <Phone className="size-4" /> {t('Zavolat klientovi')}
           </a>
         </div>
 
@@ -119,18 +120,18 @@ export function WorkerJobView(p: Props) {
             <Clock3 className="mt-0.5 size-5 shrink-0" />
             <p className="text-base">
               {job.status === 'awaiting_approval'
-                ? 'Předáno ke schválení. Čeká se na majitele, nic dalšího tu nemusíte dělat.'
-                : 'Zakázka je schválená a uzavřená.'}
+                ? t('Předáno ke schválení. Čeká se na majitele, nic dalšího tu nemusíte dělat.')
+                : t('Zakázka je schválená a uzavřená.')}
               {job.handover && (
                 <span className="mt-1 block text-sm">
-                  {job.handover.signature ? `Převzal(a) ${job.handover.clientName} s podpisem.` : 'Předáno bez podpisu zákazníka.'}
+                  {job.handover.signature ? t('Převzal(a) {name} s podpisem.', { name: job.handover.clientName }) : t('Předáno bez podpisu zákazníka.')}
                 </span>
               )}
             </p>
           </div>
         ) : (
           <>
-            <section className="mt-6" aria-label="Měření času">
+            <section className="mt-6" aria-label={t('Měření času')}>
               <TimerButton
                 running={runningHere}
                 switching={Boolean(myTimer && !runningHere)}
@@ -143,8 +144,8 @@ export function WorkerJobView(p: Props) {
 
             {stages.length > 0 ? (
               <section className="mt-8" aria-labelledby="stages-h">
-                <SectionTitle id="stages-h" aside={`hotovo ${job.progressPct} %`}>
-                  Etapy
+                <SectionTitle id="stages-h" aside={t('hotovo {p} %', { p: job.progressPct })}>
+                  {t('Etapy')}
                 </SectionTitle>
                 <ol className="mt-2 space-y-2">
                   {stages.map((st) => {
@@ -165,9 +166,9 @@ export function WorkerJobView(p: Props) {
                             {st.doneAt ? <Check className="size-4" strokeWidth={3} /> : <Hammer className="size-3.5" />}
                           </span>
                           <span className="min-w-0 flex-1 text-base font-semibold text-ink">{st.name}</span>
-                          {working && <span className="text-sm font-medium text-ink-2">{runningHere ? 'měřím sem' : 'pracuji na této'}</span>}
+                          {working && <span className="text-sm font-medium text-ink-2">{runningHere ? t('měřím sem') : t('pracuji na této')}</span>}
                         </button>
-                        <div className="mt-2 grid grid-cols-5 gap-1" role="radiogroup" aria-label={`Dokončenost etapy ${st.name}`}>
+                        <div className="mt-2 grid grid-cols-5 gap-1" role="radiogroup" aria-label={t('Dokončenost etapy {name}', { name: st.name })}>
                           {STEPS.map((pct) => {
                             const on = st.progressPct === pct;
                             return (
@@ -194,10 +195,10 @@ export function WorkerJobView(p: Props) {
               </section>
             ) : (
             <section className="mt-8" aria-labelledby="progress-h">
-              <SectionTitle id="progress-h" aside={!STEPS.includes(job.progressPct) ? `nyní ${job.progressPct} %` : undefined}>
-                Kolik je hotovo?
+              <SectionTitle id="progress-h" aside={!STEPS.includes(job.progressPct) ? t('nyní {p} %', { p: job.progressPct }) : undefined}>
+                {t('Kolik je hotovo?')}
               </SectionTitle>
-              <div className="mt-3 grid grid-cols-5 gap-1.5" role="radiogroup" aria-label="Dokončenost">
+              <div className="mt-3 grid grid-cols-5 gap-1.5" role="radiogroup" aria-label={t('Dokončenost')}>
                 {STEPS.map((pct) => {
                   const active = job.progressPct === pct;
                   return (
@@ -225,8 +226,8 @@ export function WorkerJobView(p: Props) {
 
             {/* Kontrolní seznam */}
             <section className="mt-8" aria-labelledby="check-h">
-              <SectionTitle id="check-h" aside={`${done} z ${checklist.length}`}>
-                Kontrolní seznam
+              <SectionTitle id="check-h" aside={t('{a} z {b}', { a: done, b: checklist.length })}>
+                {t('Kontrolní seznam')}
               </SectionTitle>
               <ul className="mt-2 divide-y divide-line rounded-2xl border border-line bg-surface">
                 {checklist.map((item) => {
@@ -252,7 +253,7 @@ export function WorkerJobView(p: Props) {
                         </motion.span>
                         <span className={`min-w-0 flex-1 text-base ${isDone ? 'text-ink-3 line-through' : 'text-ink'}`}>
                           {item.text}
-                          {item.required && !isDone && <span className="ml-1.5 text-sm font-medium text-crit-ink">povinné</span>}
+                          {item.required && !isDone && <span className="ml-1.5 text-sm font-medium text-crit-ink">{t('povinné')}</span>}
                         </span>
                       </button>
                     </li>
@@ -263,8 +264,8 @@ export function WorkerJobView(p: Props) {
 
             {/* Materiál */}
             <section className="mt-8" aria-labelledby="mat-h">
-              <SectionTitle id="mat-h" aside="vydáno / plán">
-                Materiál
+              <SectionTitle id="mat-h" aside={t('vydáno / plán')}>
+                {t('Materiál')}
               </SectionTitle>
               {job.materialPlan.length > 0 && (
                 <ul className="mt-2 divide-y divide-line rounded-2xl border border-line bg-surface">
@@ -274,7 +275,7 @@ export function WorkerJobView(p: Props) {
                       <li key={l.materialId} className="flex items-center gap-3 px-4 py-3">
                         <span className="min-w-0 flex-1 text-base text-ink">{l.name}</span>
                         <span className={`text-base tabular-nums ${over ? 'font-semibold text-crit-ink' : 'text-ink-2'}`}>
-                          {l.plannedQty === 0 ? `${fmt.num(l.usedQty)} ${l.unit}, mimo plán` : `${fmt.num(l.usedQty)} / ${fmt.num(l.plannedQty)} ${l.unit}`}
+                          {l.plannedQty === 0 ? t('{q} {u}, mimo plán', { q: fmt.num(l.usedQty), u: l.unit }) : `${fmt.num(l.usedQty)} / ${fmt.num(l.plannedQty)} ${l.unit}`}
                         </span>
                       </li>
                     );
@@ -286,21 +287,21 @@ export function WorkerJobView(p: Props) {
                 onClick={p.onOpenMaterial}
                 className="mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-xl border-2 border-ink bg-surface text-base font-semibold text-ink transition active:scale-[0.98]"
               >
-                <Package className="size-5" /> Vydat nebo vrátit materiál
+                <Package className="size-5" /> {t('Vydat nebo vrátit materiál')}
               </button>
             </section>
 
             {/* Vícepráce */}
             <section className="mt-8" aria-labelledby="extra-h">
-              <SectionTitle id="extra-h">Vícepráce</SectionTitle>
+              <SectionTitle id="extra-h">{t('Vícepráce')}</SectionTitle>
               {extras.length > 0 && (
                 <ul className="mt-2 space-y-2">
                   {extras.map((e) => (
                     <li key={e.id} className="rounded-2xl border border-line bg-surface px-4 py-3">
                       <p className="text-base text-ink">{e.description}</p>
                       <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-ink-3">
-                        <span className={`rounded-full px-2 py-0.5 font-medium ${EXTRA_STATUS[e.status].cls}`}>{EXTRA_STATUS[e.status].label}</span>
-                        {e.hours.toLocaleString('cs-CZ')} h{e.materialCost > 0 && `, materiál ${fmt.czk(e.materialCost)}`}
+                        <span className={`rounded-full px-2 py-0.5 font-medium ${EXTRA_STATUS[e.status].cls}`}>{EXTRA_STATUS[e.status].label()}</span>
+                        {e.hours.toLocaleString(localeOf())} h{e.materialCost > 0 && t(', materiál {c}', { c: fmt.czk(e.materialCost) })}
                       </p>
                     </li>
                   ))}
@@ -311,7 +312,7 @@ export function WorkerJobView(p: Props) {
                 onClick={() => setExtraOpen(true)}
                 className="mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line text-base font-medium text-ink-2 active:bg-surface"
               >
-                <Wrench className="size-5" /> Zákazník chce něco navíc
+                <Wrench className="size-5" /> {t('Zákazník chce něco navíc')}
               </button>
             </section>
           </>
@@ -321,7 +322,7 @@ export function WorkerJobView(p: Props) {
         <WorkerPhotos photos={p.photos} members={members} myUid={myUid} onAdd={p.onAddPhotos} onDelete={p.onDeletePhoto} onTag={p.onTagPhoto} />
 
         <section className="mt-8" aria-labelledby="notes-h">
-          <SectionTitle id="notes-h">Zprávy</SectionTitle>
+          <SectionTitle id="notes-h">{t('Zprávy')}</SectionTitle>
           <div className="mt-2">
             <NotesThread notes={p.notes} members={members} myUid={myUid} onSend={p.onSendNote} variant="touch" />
           </div>
@@ -339,7 +340,7 @@ export function WorkerJobView(p: Props) {
               }}
               className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-concrete text-base font-semibold text-ink transition active:scale-[0.98]"
             >
-              <Check className="size-5" /> Hotovo, předat ke schválení
+              <Check className="size-5" /> {t('Hotovo, předat ke schválení')}
             </button>
           </div>
         </div>

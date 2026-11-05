@@ -2,6 +2,7 @@
 
 import { LayoutGroup, motion } from 'framer-motion';
 import { Minus, Plus, ScanBarcode, Search } from 'lucide-react';
+import { t } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import { BarcodeScanner } from '@/components/ui/BarcodeScanner';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -28,7 +29,7 @@ interface Props {
 /** Krok počítadla podle jednotky: kabel po 5 m, kusy po jednom. */
 const stepFor = (unit: string) => (unit === 'm' ? 5 : 1);
 
-const plural = (n: number) => (n === 1 ? 'položka' : n < 5 ? 'položky' : 'položek');
+const plural = (n: number) => (n === 1 ? t('položka') : n < 5 ? t('položky') : t('položek'));
 
 /**
  * Výdej a vrácení materiálu. Výdej jde přednostně z auta dělníka, vratka se vrací do auta.
@@ -117,7 +118,7 @@ export function MaterialSheet({ job, catalog, vanStock, vanName, open, onClose, 
       <BottomSheet
         open={open}
         onClose={onClose}
-        title="Materiál"
+        title={t('Materiál')}
         footer={
           <button
             type="button"
@@ -128,19 +129,19 @@ export function MaterialSheet({ job, catalog, vanStock, vanName, open, onClose, 
             }`}
           >
             {!picked.length
-              ? 'Vyberte množství'
+              ? t('Vyberte množství')
               : mode === 'issue'
-                ? `Zapsat výdej (${picked.length} ${plural(picked.length)}, ${fmt.czk(total)})`
-                : `Vrátit ${vanName ? 'do auta' : 'do skladu'} (${picked.length} ${plural(picked.length)}, ${fmt.czk(total)})`}
+                ? t('Zapsat výdej ({n} {items}, {sum})', { n: picked.length, items: plural(picked.length), sum: fmt.czk(total) })
+                : t(vanName ? 'Vrátit do auta ({n} {items}, {sum})' : 'Vrátit do skladu ({n} {items}, {sum})', { n: picked.length, items: plural(picked.length), sum: fmt.czk(total) })}
           </button>
         }
       >
         <LayoutGroup id="mat-mode">
-          <div className="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-concrete p-1" role="radiogroup" aria-label="Výdej nebo vratka">
+          <div className="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-concrete p-1" role="radiogroup" aria-label={t('Výdej nebo vratka')}>
             {(
               [
-                ['issue', 'Vydat'],
-                ['return', 'Vrátit nespotřebované'],
+                ['issue', t('Vydat')],
+                ['return', t('Vrátit nespotřebované')],
               ] as const
             ).map(([m, label]) => (
               <button
@@ -158,11 +159,11 @@ export function MaterialSheet({ job, catalog, vanStock, vanName, open, onClose, 
           </div>
         </LayoutGroup>
 
-        {vanName && mode === 'issue' && <p className="mb-1 text-sm text-ink-2">Vydává se nejdřív z auta {vanName}, zbytek z hlavního skladu.</p>}
+        {vanName && mode === 'issue' && <p className="mb-1 text-sm text-ink-2">{t('Vydává se nejdřív z auta {van}, zbytek z hlavního skladu.', { van: vanName })}</p>}
 
         {lines.length === 0 && !searching && (
           <p className="py-2 text-base text-ink-2">
-            {mode === 'issue' ? 'Na zakázce zatím není naplánovaný žádný materiál.' : 'Na tuto zakázku se zatím nic nevydalo, není co vracet.'}
+            {mode === 'issue' ? t('Na zakázce zatím není naplánovaný žádný materiál.') : t('Na tuto zakázku se zatím nic nevydalo, není co vracet.')}
           </p>
         )}
         <ul className="divide-y divide-line">
@@ -182,11 +183,11 @@ export function MaterialSheet({ job, catalog, vanStock, vanName, open, onClose, 
                   <p className="text-base font-medium text-ink">{l.name}</p>
                   <p className="text-sm text-ink-3 tabular-nums">
                     {mode === 'return'
-                      ? `vydáno ${fmt.num(l.usedQty)} ${l.unit}`
+                      ? t('vydáno {q} {u}', { q: fmt.num(l.usedQty), u: l.unit })
                       : isExtra(l.materialId) || l.plannedQty === 0
-                        ? 'mimo plán'
-                        : `zbývá z plánu ${fmt.num(remaining)} ${l.unit}`}
-                    {mode === 'issue' && inVan !== undefined && `, v autě ${fmt.num(Math.max(0, inVan))}`}
+                        ? t('mimo plán')
+                        : t('zbývá z plánu {q} {u}', { q: fmt.num(remaining), u: l.unit })}
+                    {mode === 'issue' && inVan !== undefined && t(', v autě {q}', { q: fmt.num(Math.max(0, inVan)) })}
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
@@ -205,7 +206,7 @@ export function MaterialSheet({ job, catalog, vanStock, vanName, open, onClose, 
                   </span>
                   <button
                     type="button"
-                    aria-label={`Přidat ${step} ${l.unit}`}
+                    aria-label={t('Přidat {q} {u}', { q: step, u: l.unit })}
                     disabled={q >= max}
                     onClick={() => change(l.materialId, step, max)}
                     className={`grid size-12 place-items-center rounded-xl text-white transition active:scale-95 disabled:bg-line ${mode === 'issue' ? 'bg-ink' : 'bg-good'}`}
@@ -224,7 +225,7 @@ export function MaterialSheet({ job, catalog, vanStock, vanName, open, onClose, 
             onClick={() => setScanning(true)}
             className="flex h-14 items-center justify-center gap-2 rounded-xl border-2 border-ink text-base font-semibold text-ink active:bg-concrete"
           >
-            <ScanBarcode className="size-5" /> Skenovat kód
+            <ScanBarcode className="size-5" /> {t('Skenovat kód')}
           </button>
           {mode === 'issue' && (
             <button
@@ -233,7 +234,7 @@ export function MaterialSheet({ job, catalog, vanStock, vanName, open, onClose, 
               aria-expanded={searching}
               className="flex h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line text-base font-medium text-ink-2 active:bg-concrete"
             >
-              <Search className="size-5" /> Mimo plán
+              <Search className="size-5" /> {t('Mimo plán')}
             </button>
           )}
           {searching && mode === 'issue' && (

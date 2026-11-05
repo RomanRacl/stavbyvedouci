@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import { SendHorizontal } from 'lucide-react';
+import { localeOf, t } from '@/lib/i18n';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { DictateButton } from '@/components/ui/DictateButton';
 import type { JobNote, Member } from '@/types/firestore';
@@ -46,7 +47,7 @@ export function NotesThread({ notes, members, myUid, onSend, variant = 'desktop'
     <div>
       {sorted.length === 0 ? (
         <p className={`rounded-lg border border-dashed border-line px-4 py-3 text-ink-2 ${touch ? 'text-base' : 'text-sm'}`}>
-          Zatím žádné zprávy. Napište třeba, kde jsou klíče nebo co zákazník chce navíc.
+          {t('Zatím žádné zprávy. Napište třeba, kde jsou klíče nebo co zákazník chce navíc.')}
         </p>
       ) : (
         <ol className={`space-y-2 overflow-y-auto ${touch ? 'max-h-96' : 'max-h-80'}`}>
@@ -69,8 +70,8 @@ export function NotesThread({ notes, members, myUid, onSend, variant = 'desktop'
                   >
                     {!mine && (
                       <p className={`text-xs font-semibold ${office ? 'text-series-1-ink' : 'text-ink-2'}`}>
-                        {author?.displayName ?? 'Neznámý'}
-                        {office && ', kancelář'}
+                        {author?.displayName ?? t('Neznámý')}
+                        {office && t(', kancelář')}
                       </p>
                     )}
                     <p className={`whitespace-pre-wrap ${touch ? 'text-base' : 'text-sm'}`}>{n.text}</p>
@@ -86,7 +87,7 @@ export function NotesThread({ notes, members, myUid, onSend, variant = 'desktop'
 
       <form onSubmit={submit} className="mt-3 flex items-end gap-2">
         <label className="min-w-0 flex-1">
-          <span className="sr-only">Nová zpráva</span>
+          <span className="sr-only">{t('Nová zpráva')}</span>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -94,7 +95,7 @@ export function NotesThread({ notes, members, myUid, onSend, variant = 'desktop'
               if (!touch && e.key === 'Enter' && !e.shiftKey) submit(e);
             }}
             rows={1}
-            placeholder="Napsat zprávu"
+            placeholder={t('Napsat zprávu')}
             className={`block w-full resize-none rounded-xl border border-line bg-surface px-3 text-ink placeholder:text-ink-3 focus:border-series-1 focus:outline-none ${
               touch ? 'min-h-12 py-3 text-base' : 'min-h-10 py-2 text-sm'
             }`}

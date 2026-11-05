@@ -1,6 +1,7 @@
 'use client';
 
 import { Minus, Plus } from 'lucide-react';
+import { t } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { DictateButton } from '@/components/ui/DictateButton';
@@ -40,7 +41,7 @@ export function ExtraWorkSheet({ open, onClose, onSubmit }: Props) {
     <BottomSheet
       open={open}
       onClose={onClose}
-      title="Nahlásit vícepráci"
+      title={t('Nahlásit vícepráci')}
       footer={
         <button
           type="button"
@@ -48,42 +49,42 @@ export function ExtraWorkSheet({ open, onClose, onSubmit }: Props) {
           onClick={() => onSubmit({ description: description.trim(), hours, materialCost: Math.round(Number(material) || 0) })}
           className="flex h-14 w-full items-center justify-center rounded-xl bg-ink text-base font-semibold text-white transition active:scale-[0.98] disabled:bg-line disabled:text-ink-3"
         >
-          Poslat ke schválení do kanceláře
+          {t('Poslat ke schválení do kanceláře')}
         </button>
       }
     >
       <div className="space-y-5 pb-4">
         <label className="block">
           <span className="mb-1.5 flex items-center justify-between text-base font-medium text-ink">
-            Co zákazník chce navíc?
+            {t('Co zákazník chce navíc?')}
             <DictateButton onText={(t) => setDescription((cur) => (cur ? `${cur} ${t}` : t))} />
           </span>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
-            placeholder="např. 2 zásuvky navíc v kuchyni nad linkou"
+            placeholder={t('např. 2 zásuvky navíc v kuchyni nad linkou')}
             className="block w-full rounded-xl border border-line bg-surface px-3 py-3 text-base text-ink placeholder:text-ink-3 focus:border-series-1 focus:outline-none"
           />
         </label>
 
         <div>
-          <span className="mb-1.5 block text-base font-medium text-ink">Odhad práce</span>
+          <span className="mb-1.5 block text-base font-medium text-ink">{t('Odhad práce')}</span>
           <div className="flex items-center gap-2">
-            <button type="button" aria-label="Ubrat půl hodiny" onClick={() => step(-0.5)} className="grid size-14 place-items-center rounded-xl border border-line active:bg-concrete">
+            <button type="button" aria-label={t('Ubrat půl hodiny')} onClick={() => step(-0.5)} className="grid size-14 place-items-center rounded-xl border border-line active:bg-concrete">
               <Minus className="size-5" />
             </button>
             <span className="flex-1 text-center font-display text-3xl font-semibold text-ink tabular-nums">
               {hours.toLocaleString('cs-CZ')} h
             </span>
-            <button type="button" aria-label="Přidat půl hodiny" onClick={() => step(0.5)} className="grid size-14 place-items-center rounded-xl bg-ink text-white active:scale-95">
+            <button type="button" aria-label={t('Přidat půl hodiny')} onClick={() => step(0.5)} className="grid size-14 place-items-center rounded-xl bg-ink text-white active:scale-95">
               <Plus className="size-5" />
             </button>
           </div>
         </div>
 
         <label className="block">
-          <span className="mb-1.5 block text-base font-medium text-ink">Materiál navíc (Kč, odhad)</span>
+          <span className="mb-1.5 block text-base font-medium text-ink">{t('Materiál navíc (Kč, odhad)')}</span>
           <input
             inputMode="numeric"
             value={material}
@@ -93,7 +94,7 @@ export function ExtraWorkSheet({ open, onClose, onSubmit }: Props) {
           />
         </label>
 
-        <p className="text-sm text-ink-2">Práci navíc začněte až po schválení kanceláří, jinak ji nemusí zákazník zaplatit.</p>
+        <p className="text-sm text-ink-2">{t('Práci navíc začněte až po schválení kanceláří, jinak ji nemusí zákazník zaplatit.')}</p>
       </div>
     </BottomSheet>
   );

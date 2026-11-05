@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, Coffee, Play, Square } from 'lucide-react';
+import { localeOf, t } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import { workedMs } from '@/lib/jobDefaults';
 import type { ActiveTimer } from '@/types/firestore';
@@ -31,7 +32,7 @@ function fmtDuration(ms: number) {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-const timeOf = (d: Date) => d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+const timeOf = (d: Date) => d.toLocaleTimeString(localeOf(), { hour: '2-digit', minute: '2-digit' });
 
 function useTick(active: boolean) {
   const [now, setNow] = useState(() => Date.now());
@@ -96,7 +97,7 @@ export function TimerButton({ running, switching, disabled, onStart, onStop, onP
           <p className="flex items-center gap-2 text-sm text-white/70">
             {paused ? (
               <>
-                <Coffee className="size-4" /> Přestávka od {timeOf(running.pausedAt!)}
+                <Coffee className="size-4" /> {t('Přestávka od {time}', { time: timeOf(running.pausedAt!) })}
               </>
             ) : (
               <>
@@ -104,7 +105,7 @@ export function TimerButton({ running, switching, disabled, onStart, onStop, onP
                   <span className="absolute inline-flex size-full animate-ping rounded-full bg-safety opacity-70 motion-reduce:hidden" />
                   <span className="relative inline-flex size-2 rounded-full bg-safety" />
                 </span>
-                Měřím čas od {timeOf(running.startedAt)}
+                {t('Měřím čas od {time}', { time: timeOf(running.startedAt) })}
               </>
             )}
           </p>
@@ -115,17 +116,17 @@ export function TimerButton({ running, switching, disabled, onStart, onStop, onP
             {fmtDuration(worked)}
           </p>
           {(running.pausedMs ?? 0) > 60_000 && (
-            <p className="mt-1 text-sm text-white/60">přestávky {Math.round((running.pausedMs ?? 0) / 60000)} min se nepočítají</p>
+            <p className="mt-1 text-sm text-white/60">{t('přestávky {m} min se nepočítají', { m: Math.round((running.pausedMs ?? 0) / 60000) })}</p>
           )}
 
           {forgot && !fixing && (
             <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-safety/15 p-3 text-[15px]">
               <AlertTriangle className="mt-0.5 size-5 shrink-0 text-safety" />
               <div className="min-w-0 flex-1">
-                <p className="font-medium">Neběží čas zbytečně?</p>
-                <p className="text-white/70">Pokud jste zapomněl ukončit, zapište skutečný konec.</p>
+                <p className="font-medium">{t('Neběží čas zbytečně?')}</p>
+                <p className="text-white/70">{t('Pokud jste zapomněl ukončit, zapište skutečný konec.')}</p>
                 <button type="button" onClick={() => setFixing(true)} className="mt-2 h-11 rounded-lg bg-safety px-4 font-semibold text-[#16202a] active:scale-[0.98]">
-                  Zadat konec práce
+                  {t('Zadat konec práce')}
                 </button>
               </div>
             </div>
@@ -134,7 +135,7 @@ export function TimerButton({ running, switching, disabled, onStart, onStop, onP
           {fixing ? (
             <div className="mt-4 rounded-xl bg-white/10 p-3">
               <label className="block text-[15px]">
-                Skončil jsem v
+                {t('Skončil jsem v')}
                 <input
                   type="time"
                   value={endTime}
@@ -144,10 +145,10 @@ export function TimerButton({ running, switching, disabled, onStart, onStop, onP
               </label>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => setFixing(false)} className="h-12 rounded-lg bg-white/10 font-medium">
-                  Zpět
+                  {t('Zpět')}
                 </button>
                 <button type="button" onClick={stopAt} className="h-12 rounded-lg bg-safety font-semibold text-[#16202a]">
-                  Zapsat a ukončit
+                  {t('Zapsat a ukončit')}
                 </button>
               </div>
             </div>
@@ -159,14 +160,14 @@ export function TimerButton({ running, switching, disabled, onStart, onStop, onP
                 className="flex h-16 items-center justify-center gap-2 rounded-xl bg-white/12 text-base font-semibold transition active:scale-[0.98]"
               >
                 {paused ? <Play className="size-5 fill-current" /> : <Coffee className="size-5" />}
-                {paused ? 'Pokračovat' : 'Přestávka'}
+                {paused ? t('Pokračovat') : t('Přestávka')}
               </button>
               <button
                 type="button"
                 onClick={() => onStop()}
                 className="flex h-16 items-center justify-center gap-2.5 rounded-xl bg-safety text-lg font-bold text-[#16202a] transition active:scale-[0.98]"
               >
-                <Square className="size-5 fill-current" /> Ukončit
+                <Square className="size-5 fill-current" /> {t('Ukončit')}
               </button>
             </div>
           )}
@@ -185,7 +186,7 @@ export function TimerButton({ running, switching, disabled, onStart, onStop, onP
           className="flex h-16 w-full items-center justify-center gap-2.5 rounded-2xl bg-ink text-lg font-bold text-white disabled:bg-line disabled:text-ink-3"
         >
           <Play className="size-5 fill-current" />
-          {switching ? 'Přepnout sem a začít' : 'Začít práci'}
+          {switching ? t('Přepnout sem a začít') : t('Začít práci')}
         </motion.button>
       )}
     </AnimatePresence>

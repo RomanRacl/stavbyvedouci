@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import { Camera, Images } from 'lucide-react';
+import { t } from '@/lib/i18n';
 import { useRef, useState } from 'react';
 import { PhotoImg } from '@/features/photos/PhotoThumb';
 import { PhotoViewer } from '@/features/photos/PhotoViewer';
@@ -47,7 +48,7 @@ export function WorkerPhotos({ photos, members, myUid, onAdd, onDelete, onTag }:
     <section className="mt-8" aria-labelledby="photos-h">
       <div className="flex items-baseline justify-between">
         <h2 id="photos-h" className="text-base font-semibold text-ink">
-          Fotky
+          {t('Fotky')}
         </h2>
         {photos.length > 0 && <span className="text-sm text-ink-3 tabular-nums">{photos.length}</span>}
       </div>
@@ -72,10 +73,10 @@ export function WorkerPhotos({ photos, members, myUid, onAdd, onDelete, onTag }:
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <button type="button" onClick={() => cameraRef.current?.click()} className={`${btn} bg-ink text-white`}>
-          <Camera className="size-5" /> Vyfotit
+          <Camera className="size-5" /> {t('Vyfotit')}
         </button>
         <button type="button" onClick={() => galleryRef.current?.click()} className={`${btn} border-2 border-ink bg-surface text-ink`}>
-          <Images className="size-5" /> Z galerie
+          <Images className="size-5" /> {t('Z galerie')}
         </button>
       </div>
 

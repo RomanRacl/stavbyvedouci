@@ -92,6 +92,7 @@ function InvoiceTab({ snap, say }: { snap: Snap; say: (t: string, tone?: ToastMs
   const months = useMemo(() => [...new Set(invoiced.map((j) => monthKey(j.invoice!.issuedAt)))], [invoiced]);
   const [month, setMonth] = useState('all');
   const [issuing, setIssuing] = useState<string | null>(null);
+  const [shown, setShown] = useState(50);
   const [taxDate, setTaxDate] = useState(toInputDate(new Date()));
   const exportJobs = invoiced.filter((j) => month === 'all' || monthKey(j.invoice!.issuedAt) === month);
   const missingCompany = !s.ico;
@@ -209,7 +210,7 @@ function InvoiceTab({ snap, say }: { snap: Snap; say: (t: string, tone?: ToastMs
           <p className="px-4 py-8 text-center text-sm text-ink-2">Zatím žádné vystavené podklady.</p>
         ) : (
           <ul className="divide-y divide-line">
-            {invoiced.map((j) => {
+            {invoiced.slice(0, shown).map((j) => {
               const b = invoiceBasis(j, s);
               return (
                 <li key={j.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
@@ -242,6 +243,13 @@ function InvoiceTab({ snap, say }: { snap: Snap; say: (t: string, tone?: ToastMs
               );
             })}
           </ul>
+        )}
+        {invoiced.length > shown && (
+          <div className="border-t border-line px-4 py-3 text-center">
+            <button type="button" onClick={() => setShown((n) => n + 100)} className="text-sm font-medium text-series-1-ink underline-offset-4 hover:underline">
+              Zobrazit dalších {Math.min(100, invoiced.length - shown)} z {invoiced.length - shown}
+            </button>
+          </div>
         )}
         <p className="border-t border-line px-4 py-3 text-xs text-ink-3">
           XML pro POHODU obsahuje vydané faktury s položkami a sazbou DPH; čísla faktur přidělí POHODA podle své řady. U přenesené daňové povinnosti v POHODĚ zkontrolujte členění DPH. CSV otevřete v Excelu nebo naimportujete do jiného programu.

@@ -1,6 +1,7 @@
 'use client';
 
 import { Check } from 'lucide-react';
+import { localeOf, t } from '@/lib/i18n';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { dayKey, workedMs } from '@/lib/jobDefaults';
 import type { ActiveTimer, Job, TimeLog } from '@/types/firestore';
@@ -15,8 +16,8 @@ interface Props {
   onConfirm: () => void;
 }
 
-const hm = (min: number) => `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')} min`;
-const time = (d: Date) => d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+const hm = (min: number) => t('{h} h {m} min', { h: Math.floor(min / 60), m: String(min % 60).padStart(2, '0') });
+const time = (d: Date) => d.toLocaleTimeString(localeOf(), { hour: '2-digit', minute: '2-digit' });
 
 /** Denní výkaz: co dnes dělník odpracoval a kde. Potvrzený výkaz je podklad pro mzdy. */
 export function DayReportSheet({ open, onClose, logs, timer, jobs, confirmedAt, onConfirm }: Props) {
@@ -31,7 +32,7 @@ export function DayReportSheet({ open, onClose, logs, timer, jobs, confirmedAt, 
     <BottomSheet
       open={open}
       onClose={onClose}
-      title="Můj den"
+      title={t('Můj den')}
       footer={
         confirmedAt ? (
           <p className="flex h-14 items-center justify-center gap-2 rounded-xl bg-good/10 text-base font-medium text-good-ink">
@@ -44,7 +45,7 @@ export function DayReportSheet({ open, onClose, logs, timer, jobs, confirmedAt, 
             onClick={onConfirm}
             className="flex h-14 w-full items-center justify-center rounded-xl bg-ink text-base font-semibold text-white transition active:scale-[0.98] disabled:bg-line disabled:text-ink-3"
           >
-            {timer ? 'Nejdřív ukončete běžící práci' : 'Potvrdit výkaz za dnešek'}
+            {timer ? t('Nejdřív ukončete běžící práci') : t('Potvrdit výkaz za dnešek')}
           </button>
         )
       }
@@ -52,14 +53,14 @@ export function DayReportSheet({ open, onClose, logs, timer, jobs, confirmedAt, 
       <div className="pb-4">
         <div className="flex items-end justify-between rounded-2xl bg-ink p-4 text-white">
           <div>
-            <p className="text-sm text-white/70">Dnes odpracováno</p>
+            <p className="text-sm text-white/70">{t('Dnes odpracováno')}</p>
             <p className="font-display text-4xl font-semibold tabular-nums">{hm(total)}</p>
           </div>
-          {breaks > 0 && <p className="text-sm text-white/70">přestávky {breaks} min</p>}
+          {breaks > 0 && <p className="text-sm text-white/70">{t('přestávky {m} min', { m: breaks })}</p>}
         </div>
 
         {todays.length === 0 && !timer ? (
-          <p className="mt-4 text-base text-ink-2">Dnes zatím nemáte žádný záznam. Čas se zapíše, když na zakázce klepnete na Začít a Ukončit.</p>
+          <p className="mt-4 text-base text-ink-2">{t('Dnes zatím nemáte žádný záznam. Čas se zapíše, když na zakázce klepnete na Začít a Ukončit.')}</p>
         ) : (
           <ol className="mt-4 divide-y divide-line rounded-2xl border border-line bg-surface">
             {todays.map((l) => {
@@ -67,7 +68,7 @@ export function DayReportSheet({ open, onClose, logs, timer, jobs, confirmedAt, 
               return (
                 <li key={l.id} className="flex items-center gap-3 px-4 py-3">
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-base text-ink">{job?.title ?? 'Smazaná zakázka'}</span>
+                    <span className="block truncate text-base text-ink">{job?.title ?? t('Smazaná zakázka')}</span>
                     <span className="block text-sm text-ink-3 tabular-nums">
                       {time(l.startedAt)}–{l.endedAt && time(l.endedAt)}
                     </span>
@@ -80,7 +81,7 @@ export function DayReportSheet({ open, onClose, logs, timer, jobs, confirmedAt, 
               <li className="flex items-center gap-3 px-4 py-3">
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-base text-ink">{jobOf(timer.jobId)?.title}</span>
-                  <span className="block text-sm text-ink-3 tabular-nums">od {time(timer.startedAt)}, stále běží</span>
+                  <span className="block text-sm text-ink-3 tabular-nums">{t('od {time}, stále běží', { time: time(timer.startedAt) })}</span>
                 </span>
                 <span className="text-base font-semibold text-ink-2 tabular-nums">{hm(runningMin)}</span>
               </li>
