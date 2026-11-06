@@ -1,10 +1,11 @@
 'use client';
 
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   CalendarDays,
   ClipboardList,
   FileText,
+  Bell,
   Handshake,
   Image as ImageIcon,
   HardHat,
@@ -13,6 +14,7 @@ import {
   Package,
   Pin,
   PinOff,
+  Search,
   Settings,
   ShoppingCart,
   Smartphone,
@@ -27,7 +29,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
-import { SectionBackdrop, useBackdropOn } from './SectionBackdrop';
+import { SectionBackdrop, sectionOf, useBackdropOn } from './SectionBackdrop';
+import { CommandPalette, openPalette } from './CommandPalette';
+import { BellButton, NotificationDrawer, useNotices } from './NotificationCenter';
+import { APP_NAME } from '@/lib/brand';
 import { allAlerts } from '@/lib/analytics';
 import { receivables } from '@/lib/finance';
 import { resetLangForOffice } from '@/lib/i18n';
@@ -182,7 +187,7 @@ function Logo({ withName }: { withName: string }) {
     <Link href="/dashboard" className="flex h-10 items-center gap-3 rounded-lg px-2 font-display text-base font-bold whitespace-nowrap text-ink">
       {/* eslint-disable-next-line @next/next/no-img-element -- malá statická ikona */}
       <img src="/icons/icon-192.png" alt="" className="size-8 shrink-0 rounded-md" />
-      <span className={withName}>Stavbyvedoucí</span>
+      <span className={withName}>{APP_NAME}</span>
     </Link>
   );
 }
@@ -203,6 +208,18 @@ export function OwnerShell({ children }: { children: ReactNode }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const current = ALL.find((l) => isActive(path, l.href));
   const waiting = Object.values(badges).reduce((a, b) => a + b, 0);
+  const reduce = useReducedMotion();
+  const { notices, seen, unseen, markSeen } = useNotices();
+  const [noticesOpen, setNoticesOpen] = useState(false);
+  // „Nové“ se v panelu ukazuje podle stavu před otevřením, i když se hned označí jako viděné.
+  const [seenAtOpen, setSeenAtOpen] = useState<Set<string>>(new Set());
+  const openNotices = () => {
+    setSeenAtOpen(new Set(seen));
+    setNoticesOpen(true);
+    setOpen(false);
+    markSeen();
+  };
+  const { custom } = useBackdropCustom();
 
   useEffect(() => {
     try {
@@ -266,7 +283,9 @@ export function OwnerShell({ children }: { children: ReactNode }) {
   return (
     <div className={`relative isolate min-h-dvh bg-concrete ${pinned ? 'lg:pl-64' : 'lg:pl-16'} ${backdrop ? 'has-backdrop' : ''}`}>
       {skip}
-      <SectionBackdrop path={path} />
+      <SectionBackdrop path={path} custom={custom} />
+      <CommandPalette links={ALL} />
+      <NotificationDrawer open={noticesOpen} onClose={() => setNoticesOpen(false)} notices={notices} seen={seenAtOpen} />
 
       {/* ---------- počítač: boční lišta ---------- */}
       <nav
@@ -276,7 +295,39 @@ export function OwnerShell({ children }: { children: ReactNode }) {
         }`}
       >
         <Logo withName={`transition-opacity duration-150 ${pinned ? '' : 'opacity-0 group-hover/nav:opacity-100 group-focus-within/nav:opacity-100'}`} />
-        <div className="mt-5 flex-1">
+        <div className="mt-4 flex flex-col gap-0.5">
+          <button
+            type="button"
+            onClick={openPalette}
+            title={pinned ? undefined : 'Hledat (Ctrl K)'}
+            className="flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium whitespace-nowrap text-ink-2 transition-colors hover:bg-concrete hover:text-ink"
+          >
+            <Search className="size-[18px] shrink-0" aria-hidden />
+            <span className={`flex flex-1 items-center gap-2 transition-opacity duration-150 ${pinned ? '' : 'opacity-0 group-hover/nav:opacity-100 group-focus-within/nav:opacity-100'}`}>
+              Hledat
+              <kbd className="ml-auto rounded border border-line px-1.5 text-[11px] text-ink-3">Ctrl K</kbd>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={openNotices}
+            aria-label={unseen ? `Upozornění, nových ${unseen}` : 'Upozornění'}
+            title={pinned ? undefined : 'Upozornění'}
+            className="relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium whitespace-nowrap text-ink-2 transition-colors hover:bg-concrete hover:text-ink"
+          >
+            <Bell className="size-[18px] shrink-0" aria-hidden />
+            <span className={`flex flex-1 items-center gap-2 transition-opacity duration-150 ${pinned ? '' : 'opacity-0 group-hover/nav:opacity-100 group-focus-within/nav:opacity-100'}`}>
+              Upozornění
+              {notices.length > 0 && <span className="ml-auto rounded-full bg-concrete px-1.5 text-xs text-ink-2 tabular-nums">{notices.length}</span>}
+            </span>
+            {unseen > 0 && (
+              <span className="absolute top-1 left-6 grid min-w-[18px] place-items-center rounded-full bg-crit px-1 text-[11px] leading-[18px] font-bold text-white tabular-nums ring-2 ring-surface" aria-hidden>
+                {unseen > 99 ? '99+' : unseen}
+              </span>
+            )}
+          </button>
+        </div>
+        <div className="mt-4 flex-1">
           <NavList path={path} badges={badges} expanded={pinned} />
         </div>
         <div className="mt-4 flex flex-col gap-0.5 border-t border-line pt-3">
@@ -322,7 +373,11 @@ export function OwnerShell({ children }: { children: ReactNode }) {
         </button>
         {/* eslint-disable-next-line @next/next/no-img-element -- malá statická ikona */}
         <img src="/icons/icon-192.png" alt="" className="size-7 rounded-md" />
-        <p className="min-w-0 flex-1 truncate font-display text-base font-semibold text-ink">{current?.label ?? 'Stavbyvedoucí'}</p>
+        <p className="min-w-0 flex-1 truncate font-display text-base font-semibold text-ink">{current?.label ?? APP_NAME}</p>
+        <button type="button" onClick={openPalette} aria-label="Hledat" className="grid size-11 place-items-center rounded-lg text-ink-2 hover:bg-concrete hover:text-ink">
+          <Search className="size-[18px]" />
+        </button>
+        <BellButton unseen={unseen} onClick={openNotices} className="size-11" />
         <ThemeToggle />
       </header>
 
@@ -365,8 +420,22 @@ export function OwnerShell({ children }: { children: ReactNode }) {
         )}
       </AnimatePresence>
 
-      {children}
+      {/* Plynulý přechod mezi sekcemi: obsah se jemně zvedne a prolne (bez pohybu při omezených animacích). */}
+      <motion.div
+        key={sectionOf(path)}
+        initial={reduce ? { opacity: 0 } : { opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: reduce ? 0.15 : 0.32, ease: [0.22, 1, 0.36, 1] }}
+      >
+        {children}
+      </motion.div>
     </div>
   );
+}
+
+/** Vlastní fotky na pozadí z nastavení firmy. */
+function useBackdropCustom() {
+  const snap = useSnapshot();
+  return { custom: snap?.settings.backdrops };
 }
 

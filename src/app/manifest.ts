@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/lib/brand';
 import type { MetadataRoute } from 'next';
 
 /**
@@ -6,8 +7,8 @@ import type { MetadataRoute } from 'next';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Stavbyvedoucí',
-    short_name: 'Stavbyvedoucí',
+    name: APP_NAME,
+    short_name: APP_NAME,
     description: 'Zakázky, měření času, materiál a fotky z terénu.',
     lang: 'cs',
     start_url: '/w',

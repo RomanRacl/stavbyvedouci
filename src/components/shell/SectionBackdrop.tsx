@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { photoUrl } from '@/lib/photos/photoBlobs';
 
 /**
  * Reálné fotky na pozadí podle sekce, ve které majitel právě je.
@@ -11,7 +12,7 @@ import { useEffect, useState } from 'react';
  * Fotky jsou z Unsplash (licence Unsplash: zdarma i pro komerční použití, bez nutnosti uvádět autora),
  * načítají se přímo z jejich CDN ve velikosti podle obrazovky.
  */
-const PHOTOS: Record<string, { id: string; alt: string }> = {
+export const PHOTOS: Record<string, { id: string; alt: string }> = {
   '/dashboard': { id: '1653280662710-1cac52cde6d7', alt: 'Parta na stavbě' },
   '/kalendar': { id: '1435527173128-983b87201f4d', alt: 'Plánovací diář na stole' },
   '/provoz': { id: '1614620027574-980d7c376daf', alt: 'Dodávka na silnici' },
@@ -27,7 +28,7 @@ const PHOTOS: Record<string, { id: string; alt: string }> = {
   '/nastaveni': { id: '1761544775659-aaa6fa2e5b3d', alt: 'Nářadí na stěně dílny' },
 };
 
-const url = (id: string, w: number) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&q=60&w=${w}`;
+export const unsplashUrl = (id: string, w: number) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&q=60&w=${w}`;
 
 export const BACKDROP_KEY = 'stavbyvedouci:backdrop';
 export const BACKDROP_EVENT = 'stavbyvedouci:backdrop';
@@ -61,36 +62,75 @@ export function useBackdropOn(): [boolean, (on: boolean) => void] {
   return [on, set];
 }
 
-const sectionOf = (path: string) => Object.keys(PHOTOS).find((k) => path === k || path.startsWith(`${k}/`)) ?? '/dashboard';
+export const sectionOf = (path: string) => Object.keys(PHOTOS).find((k) => path === k || path.startsWith(`${k}/`)) ?? '/dashboard';
 
-export function SectionBackdrop({ path }: { path: string }) {
+/** Popisky sekcí pro Nastavení (vlastní fotky). */
+export const SECTION_LABELS: Record<string, string> = {
+  '/dashboard': 'Zakázky',
+  '/kalendar': 'Kalendář',
+  '/provoz': 'Provoz',
+  '/obchod': 'Poptávky a obchod',
+  '/nabidky': 'Nabídky',
+  '/zakaznici': 'Zákazníci',
+  '/penize': 'Peníze',
+  '/analytika': 'Analytika',
+  '/sklad': 'Sklad',
+  '/objednavky': 'Objednávky',
+  '/tym': 'Tým',
+  '/sablony': 'Šablony',
+  '/nastaveni': 'Nastavení',
+};
+
+/** Vlastní fotka firmy (z IndexedDB, později z Firebase Storage); null = žádná nebo se ještě načítá. */
+export function useCustomPhoto(id: string | undefined): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setUrl(null);
+    if (id) void photoUrl(id).then((u) => alive && setUrl(u));
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+  return url;
+}
+
+/**
+ * `custom` = vlastní fotky firmy podle sekce. Kde firma vlastní fotku nemá, zůstává výchozí z Unsplash.
+ */
+export function SectionBackdrop({ path, custom }: { path: string; custom?: Record<string, string> }) {
   const [on] = useBackdropOn();
   const reduce = useReducedMotion();
   const section = sectionOf(path);
   const photo = PHOTOS[section];
+  const customId = custom?.[section];
+  const customUrl = useCustomPhoto(customId);
   // Fotka se ukáže až po načtení, aby se neobjevovala po kouscích.
   const [loaded, setLoaded] = useState<string | null>(null);
+  const key = customId ? `${section}:${customId}` : section;
 
   if (!on) return null;
+  // Vlastní fotka se ještě čte z úložiště – nečekáme na ni s výchozí fotkou, aby se neprostřídaly dvě.
+  if (customId && !customUrl) return null;
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden print:hidden">
       <AnimatePresence initial={false}>
         <motion.div
-          key={section}
+          key={key}
           className="absolute inset-0"
           initial={{ opacity: 0 }}
-          animate={{ opacity: loaded === section ? 1 : 0 }}
+          animate={{ opacity: loaded === key ? 1 : 0 }}
           exit={{ opacity: 0 }}
           transition={{ duration: reduce ? 0.2 : 1.1, ease: 'easeOut' }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element -- fotky jdou přímo z CDN Unsplash, optimalizace Next by je jen stahovala podruhé */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- fotky jdou přímo z CDN Unsplash nebo z úložiště prohlížeče */}
           <img
-            src={url(photo.id, 1600)}
-            srcSet={`${url(photo.id, 900)} 900w, ${url(photo.id, 1600)} 1600w, ${url(photo.id, 2400)} 2400w`}
+            src={customUrl ?? unsplashUrl(photo.id, 1600)}
+            srcSet={customUrl ? undefined : `${unsplashUrl(photo.id, 900)} 900w, ${unsplashUrl(photo.id, 1600)} 1600w, ${unsplashUrl(photo.id, 2400)} 2400w`}
             sizes="100vw"
             alt=""
             decoding="async"
-            onLoad={() => setLoaded(section)}
+            onLoad={() => setLoaded(key)}
             className={`size-full object-cover ${reduce ? '' : 'backdrop-kenburns'}`}
           />
         </motion.div>

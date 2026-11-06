@@ -132,6 +132,47 @@
   --color-line: color-mix(in oklab, var(--color-ink-3) 70%, transparent);
 }
 
+/*
+ * Režim na slunce (mobil dělníka): vždy světlý, černý text, tmavé okraje, tučnější a o 12 % větší písmo.
+ * S režimem pro rukavice se velikosti sčítají.
+ */
+:root[data-sun='on'] {
+  font-size: 112%;
+}
+:root[data-sun='on'][data-gloves='on'] {
+  font-size: 128%;
+}
+:root[data-sun='on'] .worker-root {
+  --color-concrete: #ffffff;
+  --color-surface: #ffffff;
+  --color-line: #39424c;
+  --color-ink: #000000;
+  --color-ink-2: #11181f;
+  --color-ink-3: #262f38;
+  --color-series-1: #0b4fa6;
+  --color-series-1-ink: #0b4fa6;
+  --color-good: #0d6b34;
+  --color-good-ink: #0d6b34;
+  --color-warn: #b06f00;
+  --color-warn-ink: #6b4300;
+  --color-crit: #b3241b;
+  --color-crit-ink: #8f1a13;
+  --color-white: #ffffff;
+  color-scheme: light;
+  background-color: #ffffff;
+  color: #000000;
+  font-weight: 500;
+}
+:root[data-sun='on'] .worker-root .border {
+  border-width: 2px;
+}
+:root[data-sun='on'] .worker-root .border-t {
+  border-top-width: 2px;
+}
+:root[data-sun='on'] .worker-root .border-b {
+  border-bottom-width: 2px;
+}
+
 /* Užší řez Archiva pro čísla, kódy zakázek a nadpisy – „technický výkres“. */
 @utility font-display {
   font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
