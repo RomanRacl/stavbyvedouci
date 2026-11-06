@@ -493,6 +493,8 @@ export interface CompanySettings {
   siteRadiusM?: number;
   /** Razítko s kódem zakázky, datem a polohou do fotek z mobilu (výchozí ano). */
   photoStamp?: boolean;
+  /** Vlastní fotky na pozadí sekcí kanceláře: sekce (např. '/sklad') -> ID souboru. Bez záznamu = výchozí fotka. */
+  backdrops?: Record<string, string>;
 }
 
 export interface Goals {

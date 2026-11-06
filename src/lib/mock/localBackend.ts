@@ -79,7 +79,7 @@ import { describeChanges } from '@/lib/audit';
 import { clientKey as clientKeyOf, progressFromStages, safetyOf } from '@/lib/operations';
 import { activeTier, invoiceBasis, itemsForTier, quoteHours, quoteTotals } from '@/lib/money';
 import { nextDocNumber } from '@/lib/finance';
-import { readStore, storeVersion, updateStore, type Stored } from './localStore';
+import { emptyStore, readStore, replaceStore, storeVersion, updateStore, type Stored } from './localStore';
 
 /**
  * „Server“ pro režim bez Firebase. Každá funkce odpovídá budoucí operaci ve Firestore
@@ -115,44 +115,99 @@ export interface Snapshot {
   reservations: Reservation[];
   absences: Absence[];
   subcontractors: Subcontractor[];
+  /** Firma jede naostro (bez ukázkových dat). */
+  fresh: boolean;
 }
 
 const newId = (prefix: string) => `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 function build(s: Stored): Snapshot {
-  const jobs = [...s.created, ...mockJobs, ...mockHistoryJobs, ...(s.loadTest ? loadTestJobs(s.loadTest) : [])]
+  // Naostro: žádná ukázková firma, jen to, co majitel sám zadal.
+  const demo = !s.fresh;
+  const d = <T,>(x: T[]): T[] => (demo ? x : []);
+  const jobs = [...s.created, ...d(mockJobs), ...d(mockHistoryJobs), ...(s.loadTest ? loadTestJobs(s.loadTest) : [])]
     .filter((j) => !s.deleted.includes(j.id))
     .map((j) => (s.patches[j.id] ? { ...j, ...s.patches[j.id] } : j));
-  const members = mockMembers.map((m) => (m.uid in s.timers ? { ...m, activeTimer: s.timers[m.uid] } : m));
+  const baseMembers = s.members ?? (demo ? mockMembers : []);
+  const members = baseMembers.map((m) => (m.uid in s.timers ? { ...m, activeTimer: s.timers[m.uid] } : m));
   return {
     jobs,
     members,
-    usage: [...s.usage, ...mockMaterialUsage],
-    catalog: s.catalog ?? mockMaterials,
+    usage: [...s.usage, ...d(mockMaterialUsage)],
+    catalog: s.catalog ?? (demo ? mockMaterials : []),
     photos: s.photos.filter((p) => !s.deleted.includes(p.jobId)),
-    notes: [...mockNotes, ...s.notes].filter((n) => !s.deleted.includes(n.jobId)),
-    timeLogs: [...s.timeLogs, ...mockTimeLogs],
-    dayReports: { ...mockDayReports, ...s.dayReports },
-    vans: mockVans,
-    stockMoves: [...mockStockMoves, ...s.stockMoves],
+    notes: [...d(mockNotes), ...s.notes].filter((n) => !s.deleted.includes(n.jobId)),
+    timeLogs: [...s.timeLogs, ...d(mockTimeLogs)],
+    dayReports: { ...(demo ? mockDayReports : {}), ...s.dayReports },
+    vans: d(mockVans),
+    stockMoves: [...d(mockStockMoves), ...s.stockMoves],
     orders: s.orders,
-    templates: s.templates ?? mockTemplates,
-    suppliers: s.suppliers ?? mockSuppliers,
+    templates: s.templates ?? (demo ? mockTemplates : []),
+    suppliers: s.suppliers ?? (demo ? mockSuppliers : []),
     settings: s.settings ?? mockSettings,
-    quotes: s.quotes ?? mockQuotes,
-    audit: [...mockAudit, ...s.audit].filter((a) => !a.jobId || !s.deleted.includes(a.jobId)),
+    quotes: s.quotes ?? (demo ? mockQuotes : []),
+    audit: [...d(mockAudit), ...s.audit].filter((a) => !a.jobId || !s.deleted.includes(a.jobId)),
     clients: s.clients,
-    recurring: s.recurring ?? mockRecurring,
-    certificates: s.certificates ?? mockCertificates,
-    leads: s.leads ?? mockLeads,
+    recurring: s.recurring ?? (demo ? mockRecurring : []),
+    certificates: s.certificates ?? (demo ? mockCertificates : []),
+    leads: s.leads ?? (demo ? mockLeads : []),
     serviceDone: s.serviceDone ?? {},
-    trips: [...mockTrips, ...(s.trips ?? [])],
-    tools: s.tools ?? mockTools,
-    toolEvents: [...mockToolEvents, ...(s.toolEvents ?? [])],
-    reservations: s.reservations ?? mockReservations,
-    absences: s.absences ?? mockAbsences,
-    subcontractors: s.subcontractors ?? mockSubcontractors,
+    trips: [...d(mockTrips), ...(s.trips ?? [])],
+    tools: s.tools ?? (demo ? mockTools : []),
+    toolEvents: [...d(mockToolEvents), ...(s.toolEvents ?? [])],
+    reservations: s.reservations ?? (demo ? mockReservations : []),
+    absences: s.absences ?? (demo ? mockAbsences : []),
+    subcontractors: s.subcontractors ?? (demo ? mockSubcontractors : []),
+    fresh: s.fresh,
   };
+}
+
+/* ---------- začátek naostro a lidé ve firmě ---------- */
+
+export interface FreshStart {
+  settings: CompanySettings;
+  members: Member[];
+  /** Ponechat ukázkový ceník materiálu, dodavatele a šablony zakázek jako výchozí bod. */
+  keepCatalog: boolean;
+}
+
+/** Výchozí nastavení nové firmy: rozumné sazby a lhůty, žádné ukázkové údaje ani režie. */
+export function defaultSettings(): CompanySettings {
+  return {
+    ...mockSettings,
+    name: '',
+    ico: '',
+    dic: '',
+    address: '',
+    phone: '',
+    email: '',
+    bankAccount: '',
+    logo: null,
+    defaultVatMode: 'standard21',
+    overheadItems: [],
+    cashBalance: undefined,
+    goals: undefined,
+    backdrops: undefined,
+  };
+}
+
+/** Smaže ukázkovou firmu a začne s vlastními údaji. */
+export function startFresh(f: FreshStart) {
+  replaceStore({
+    ...emptyStore(),
+    fresh: true,
+    settings: f.settings,
+    members: f.members.map((m) => ({ ...m, activeTimer: null })),
+    // Ceník ano, ale bez minimálních zásob ukázkového skladu – jinak by hned všechno „docházelo“.
+    catalog: f.keepCatalog ? mockMaterials.map((m) => ({ ...m, reorderPoint: 0 })) : [],
+    suppliers: f.keepCatalog ? mockSuppliers : [],
+    templates: f.keepCatalog ? mockTemplates : [],
+  });
+}
+
+/** Uloží seznam lidí (přidání, úprava, deaktivace). Běžící měření zůstanou. */
+export function saveMembers(members: Member[]) {
+  updateStore((s) => ({ ...s, members: members.map((m) => ({ ...m, activeTimer: null })) }));
 }
 
 /* ---------- historie změn ---------- */
@@ -203,7 +258,7 @@ function patchIn(s: Stored, jobId: string, patch: Partial<Job>): Stored {
     : { ...s, patches: { ...s.patches, [jobId]: { ...s.patches[jobId], ...stamped } } };
   if (before) {
     const after = { ...before, ...stamped } as Job;
-    for (const c of describeChanges(before, after, mockMembers)) next = logIn(next, jobId, c.kind, c.text);
+    for (const c of describeChanges(before, after, build(s).members)) next = logIn(next, jobId, c.kind, c.text);
   }
   return next;
 }

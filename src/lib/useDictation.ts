@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { speechLang, t } from '@/lib/i18n';
 
-interface RecognitionLike {
+export interface RecognitionLike {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
@@ -15,7 +15,7 @@ interface RecognitionLike {
 }
 type RecognitionCtor = new () => RecognitionLike;
 
-const ctor = (): RecognitionCtor | null => {
+export const recognitionCtor = (): RecognitionCtor | null => {
   if (typeof window === 'undefined') return null;
   const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
@@ -34,12 +34,12 @@ export function useDictation(onText: (text: string) => void) {
   const cb = useRef(onText);
   cb.current = onText;
 
-  useEffect(() => setSupported(Boolean(ctor())), []);
+  useEffect(() => setSupported(Boolean(recognitionCtor())), []);
 
   const stop = useCallback(() => rec.current?.stop(), []);
 
   const start = useCallback(() => {
-    const C = ctor();
+    const C = recognitionCtor();
     if (!C) return;
     setError(null);
     const r = new C();

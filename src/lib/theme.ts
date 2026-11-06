@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 export type ThemePref = 'system' | 'light' | 'dark';
 const KEY = 'stavbyvedouci:theme';
 const GLOVES = 'stavbyvedouci:gloves';
+const SUN = 'stavbyvedouci:sun';
 
 /**
  * Skript do <head>, který nastaví téma ještě před prvním vykreslením –
@@ -65,6 +66,40 @@ export function useGloves() {
     setOn((v) => {
       try {
         localStorage.setItem(GLOVES, v ? 'off' : 'on');
+      } catch {
+        /* nic */
+      }
+      return !v;
+    });
+  }, []);
+  return [on, toggle] as const;
+}
+
+/**
+ * Režim na slunce (mobil dělníka): maximální kontrast – černé písmo na bílé, silnější okraje,
+ * tučnější a větší text. Na přímém slunci je běžná šedá nečitelná.
+ */
+export function useSun() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    try {
+      setOn(localStorage.getItem(SUN) === 'on');
+    } catch {
+      /* nic */
+    }
+  }, []);
+  useEffect(() => {
+    const el = document.documentElement;
+    if (on) el.dataset.sun = 'on';
+    else delete el.dataset.sun;
+    return () => {
+      delete el.dataset.sun;
+    };
+  }, [on]);
+  const toggle = useCallback(() => {
+    setOn((v) => {
+      try {
+        localStorage.setItem(SUN, v ? 'off' : 'on');
       } catch {
         /* nic */
       }

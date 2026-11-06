@@ -13,6 +13,7 @@ import type {
   RecurringPlan,
   CompanySettings,
   Job,
+  Member,
   JobNote,
   JobPhoto,
   JobTemplate,
@@ -66,6 +67,10 @@ export interface Stored {
   subcontractors: Subcontractor[] | null;
   /** Počet zátěžových zakázek (test rychlosti), 0 = vypnuto. */
   loadTest: number;
+  /** Firma začala naostro: ukázková data se nepřimíchávají. */
+  fresh: boolean;
+  /** Lidé ve firmě; null = ukázková parta. */
+  members: Member[] | null;
 }
 
 const EMPTY: Stored = {
@@ -98,6 +103,8 @@ const EMPTY: Stored = {
   absences: null,
   subcontractors: null,
   loadTest: 0,
+  fresh: false,
+  members: null,
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
@@ -154,3 +161,16 @@ export function resetStore() {
   }
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
+
+/** Celý obsah úložiště najednou (obnova ze zálohy, začátek naostro). */
+export function replaceStore(next: Partial<Stored>) {
+  version++;
+  try {
+    localStorage.setItem(KEY, JSON.stringify({ ...EMPTY, ...next }));
+  } catch {
+    /* plné úložiště */
+  }
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
+export const emptyStore = (): Stored => ({ ...EMPTY });

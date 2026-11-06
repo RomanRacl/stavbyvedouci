@@ -1,3 +1,4 @@
+import { APP_NAME } from './brand';
 import type { CompanySettings, Job, Member, Payment, Quote, QuoteItem, QuoteTier, TimeLog, VatMode } from '@/types/firestore';
 import { extraWorkOf } from './jobDefaults';
 
@@ -242,7 +243,7 @@ ${lines}
     })
     .join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
-<dat:dataPack id="stavbyvedouci-${Date.now()}" ico="${xml(s.ico)}" application="Stavbyvedoucí" version="2.0" note="Export podkladů k fakturaci"
+<dat:dataPack id="stavbyvedouci-${Date.now()}" ico="${xml(s.ico)}" application="${xml(APP_NAME)}" version="2.0" note="Export podkladů k fakturaci"
   xmlns:dat="http://www.stormware.cz/schema/version_2/data.xsd"
   xmlns:inv="http://www.stormware.cz/schema/version_2/invoice.xsd"
   xmlns:typ="http://www.stormware.cz/schema/version_2/type.xsd">
