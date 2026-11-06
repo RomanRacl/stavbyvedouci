@@ -187,3 +187,15 @@
   animation: backdrop-kenburns 32s ease-in-out infinite alternate;
   will-change: transform;
 }
+
+/*
+ * Když jsou zapnuté fotky na pozadí, karty a tabulky v obsahu jsou poloprůhledné jako matné sklo:
+ * fotka prosvítá, rozmazání drží text čitelný. Plovoucí prvky (dialogy, nabídky, bubliny) zůstávají plné.
+ */
+@supports (backdrop-filter: blur(1px)) {
+  .has-backdrop > :not(nav, header, #mobile-menu) .bg-surface:not(:is([role='dialog'], [role='tooltip'], [role='menu'], [role='listbox'], .shadow-lg, .shadow-xl, .shadow-2xl)):not(:is([role='dialog'], [role='tooltip'], [role='menu'], [role='listbox']) *) {
+    background-color: color-mix(in oklab, var(--color-surface) 58%, transparent);
+    backdrop-filter: blur(14px) saturate(1.15);
+    -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  }
+}

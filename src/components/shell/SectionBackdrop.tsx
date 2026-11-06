@@ -96,7 +96,7 @@ export function SectionBackdrop({ path }: { path: string }) {
         </motion.div>
       </AnimatePresence>
       {/* Závoj: nahoře je fotka víc vidět (za nadpisem), níž ustupuje, aby tabulky a karty zůstaly čitelné. */}
-      <div className="absolute inset-0 bg-gradient-to-b from-concrete/72 via-concrete/88 to-concrete/96" />
+      <div className="absolute inset-0 bg-gradient-to-b from-concrete/60 via-concrete/75 to-concrete/85" />
     </div>
   );
 }

@@ -264,7 +264,7 @@ export function OwnerShell({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className={`relative isolate min-h-dvh bg-concrete ${pinned ? 'lg:pl-64' : 'lg:pl-16'}`}>
+    <div className={`relative isolate min-h-dvh bg-concrete ${pinned ? 'lg:pl-64' : 'lg:pl-16'} ${backdrop ? 'has-backdrop' : ''}`}>
       {skip}
       <SectionBackdrop path={path} />
 
