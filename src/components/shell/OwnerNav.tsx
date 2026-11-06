@@ -6,6 +6,7 @@ import {
   ClipboardList,
   FileText,
   Handshake,
+  Image as ImageIcon,
   HardHat,
   LayoutTemplate,
   Menu,
@@ -26,6 +27,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { SectionBackdrop, useBackdropOn } from './SectionBackdrop';
 import { allAlerts } from '@/lib/analytics';
 import { receivables } from '@/lib/finance';
 import { resetLangForOffice } from '@/lib/i18n';
@@ -196,6 +198,7 @@ export function OwnerShell({ children }: { children: ReactNode }) {
   resetLangForOffice();
   const badges = useBadges();
   const [pinned, setPinned] = useState(false);
+  const [backdrop, setBackdrop] = useBackdropOn();
   const [open, setOpen] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   const current = ALL.find((l) => isActive(path, l.href));
@@ -261,8 +264,9 @@ export function OwnerShell({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className={`min-h-dvh bg-concrete ${pinned ? 'lg:pl-64' : 'lg:pl-16'}`}>
+    <div className={`relative isolate min-h-dvh bg-concrete ${pinned ? 'lg:pl-64' : 'lg:pl-16'}`}>
       {skip}
+      <SectionBackdrop path={path} />
 
       {/* ---------- počítač: boční lišta ---------- */}
       <nav
@@ -279,6 +283,16 @@ export function OwnerShell({ children }: { children: ReactNode }) {
           {workerLink(pinned)}
           <div className="flex items-center gap-1 px-1">
             <ThemeToggle />
+            <button
+              type="button"
+              onClick={() => setBackdrop(!backdrop)}
+              aria-pressed={backdrop}
+              aria-label={backdrop ? 'Vypnout fotky na pozadí' : 'Zapnout fotky na pozadí'}
+              title={backdrop ? 'Vypnout fotky na pozadí' : 'Zapnout fotky na pozadí'}
+              className={`grid size-9 place-items-center rounded-lg transition hover:bg-concrete hover:text-ink ${backdrop ? 'text-ink' : 'text-ink-3'} ${pinned ? '' : 'opacity-0 group-hover/nav:opacity-100 group-focus-within/nav:opacity-100'}`}
+            >
+              <ImageIcon className="size-4" />
+            </button>
             <button
               type="button"
               onClick={togglePin}
@@ -333,7 +347,19 @@ export function OwnerShell({ children }: { children: ReactNode }) {
               <div className="mt-4 flex-1">
                 <NavList path={path} badges={badges} expanded onNavigate={() => setOpen(false)} />
               </div>
-              <div className="mt-4 border-t border-line pt-3">{workerLink(true)}</div>
+              <div className="mt-4 border-t border-line pt-3">
+                {workerLink(true)}
+                <button
+                  type="button"
+                  onClick={() => setBackdrop(!backdrop)}
+                  aria-pressed={backdrop}
+                  className="flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-ink-2 hover:bg-concrete hover:text-ink"
+                >
+                  <ImageIcon className="size-[18px] shrink-0" aria-hidden />
+                  Fotky na pozadí
+                  <span className={`ml-auto rounded-full px-2 py-0.5 text-xs font-semibold ${backdrop ? 'bg-good/12 text-good-ink' : 'bg-concrete text-ink-3'}`}>{backdrop ? 'zapnuto' : 'vypnuto'}</span>
+                </button>
+              </div>
             </motion.nav>
           </div>
         )}

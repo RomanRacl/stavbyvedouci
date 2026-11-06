@@ -173,3 +173,17 @@
     background: white;
   }
 }
+
+/* Fotky na pozadí sekcí: pomalé přiblížení a posun (Ken Burns), tam a zpět. */
+@keyframes backdrop-kenburns {
+  from {
+    transform: scale(1.04) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.16) translate3d(-2%, -1.5%, 0);
+  }
+}
+.backdrop-kenburns {
+  animation: backdrop-kenburns 32s ease-in-out infinite alternate;
+  will-change: transform;
+}
