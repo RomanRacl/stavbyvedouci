@@ -1,5 +1,8 @@
 'use client';
 
+
+import { useParamAction } from '@/lib/useTabParam';
+
 import { LayoutGroup, motion } from 'framer-motion';
 import { AlertTriangle, FileText, Layers, Plus, TrendingUp } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -9,7 +12,7 @@ import { fmt } from '@/features/analytics/lib/metrics';
 import { useSnapshot } from '@/lib/mock/useSnapshot';
 import { quoteTotals } from '@/lib/money';
 import { quotesHitByPrices, recentPriceChanges } from '@/lib/finance';
-import { repriceQuote } from '@/lib/mock/localBackend';
+import { getSnapshot, repriceQuote } from '@/lib/mock/localBackend';
 import type { Quote } from '@/types/firestore';
 import { QuoteDrawer } from './QuoteDrawer';
 
@@ -33,6 +36,18 @@ export default function QuotesPage() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]['id']>('open');
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState<Quote | null>(null);
+  useParamAction('open', (id) => {
+    if (id === 'new') {
+      setCurrent(null);
+      setOpen(true);
+      return;
+    }
+    const q = getSnapshot().quotes.find((x) => x.id === id);
+    if (q) {
+      setCurrent(q);
+      setOpen(true);
+    }
+  });
   const [toast, setToast] = useState<ToastMsg | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
 

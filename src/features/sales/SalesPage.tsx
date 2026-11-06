@@ -1,5 +1,7 @@
 'use client';
 
+
+import { useParamAction, useTabParam } from '@/lib/useTabParam';
 import { LayoutGroup, motion } from 'framer-motion';
 import { CalendarClock, Check, Copy, FileText, Phone, Plus, Trash2, Wrench } from 'lucide-react';
 import Link from 'next/link';
@@ -9,7 +11,7 @@ import { Drawer } from '@/components/ui/Drawer';
 import { Toast, type ToastMsg } from '@/components/ui/Toast';
 import { fmt } from '@/features/analytics/lib/metrics';
 import { QuoteDrawer } from '@/features/quotes/QuoteDrawer';
-import { createFromRecurring, deleteLead, markServiceDone, saveLead, setLeadStage, type Snapshot } from '@/lib/mock/localBackend';
+import { getSnapshot, createFromRecurring, deleteLead, markServiceDone, saveLead, setLeadStage, type Snapshot } from '@/lib/mock/localBackend';
 import { useSnapshot } from '@/lib/mock/useSnapshot';
 import { LEAD_SOURCES, LEAD_STAGES, leadView, LOST_REASONS, serviceReminders, winStats, type ServiceReminder } from '@/lib/sales';
 import { TRADE_LABEL, TRADES } from '@/lib/trades';
@@ -34,6 +36,7 @@ const toInputDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).
 export default function SalesPage() {
   const snap = useSnapshot();
   const [tab, setTab] = useState<Tab>('pipeline');
+  useTabParam(TABS.map((t) => t.id), setTab);
   const [toast, setToast] = useState<ToastMsg | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
   const say = (text: string, tone: ToastMsg['tone'] = 'success') => setToast({ text, tone, id: Date.now() });
@@ -88,6 +91,10 @@ function Pipeline({ snap, say }: { snap: Snapshot; say: (t: string, tone?: 'succ
   const [edit, setEdit] = useState<Lead | null>(null);
   const [over, setOver] = useState<LeadStage | null>(null);
   const [quoteFor, setQuoteFor] = useState<{ lead: Lead | null; quote: Quote | null } | null>(null);
+  useParamAction('open', (id) => {
+    const l = getSnapshot().leads.find((x) => x.id === id);
+    if (l) setEdit(l);
+  });
   const today = startOfToday().getTime();
   const open = leads.filter((l) => l.stage !== 'won' && l.stage !== 'lost');
   const followUps = open.filter((l) => l.nextStep && l.nextStep.getTime() < today + DAY);

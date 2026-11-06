@@ -6,7 +6,7 @@ import { LANGS, t, type Lang } from '@/lib/i18n';
 
 /** Dočasné „přihlášení“: dělník klepne na své jméno. Po zapojení Firebase Auth odpadne. */
 export function WorkerPicker({ members, onPick, lang, onLang }: { members: Member[]; onPick: (uid: string) => void; lang: Lang; onLang: (l: Lang) => void }) {
-  const workers = members.filter((m) => m.role !== 'owner');
+  const workers = members.filter((m) => m.role !== 'owner' && m.active);
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pt-14 pb-10">
       <div className="mb-6 flex gap-1" role="radiogroup" aria-label={t('Jazyk')}>
@@ -18,6 +18,7 @@ export function WorkerPicker({ members, onPick, lang, onLang }: { members: Membe
       </div>
       <h1 className="font-display text-3xl font-bold tracking-tight text-ink">{t('Kdo jste?')}</h1>
       <p className="mt-2 text-base text-ink-2">{t('Klepněte na své jméno. Telefon si vás zapamatuje.')}</p>
+      {workers.length === 0 && <p className="mt-8 rounded-2xl border border-dashed border-line p-5 text-base text-ink-2">{t('Zatím tu nikdo není. Majitel přidá lidi v kanceláři v sekci Tým.')}</p>}
       <ul className="mt-8 space-y-3">
         {workers.map((w, i) => (
           <motion.li

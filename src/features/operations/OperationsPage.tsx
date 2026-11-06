@@ -1,5 +1,6 @@
 'use client';
 
+import { useTabParam } from '@/lib/useTabParam';
 import { LayoutGroup, motion } from 'framer-motion';
 import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, CalendarRange, Car, Check, Plus, Printer, Star, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
@@ -64,6 +65,7 @@ type Say = (t: string, tone?: 'success' | 'error') => void;
 export default function OperationsPage() {
   const snap = useSnapshot();
   const [tab, setTab] = useState<Tab>('trips');
+  useTabParam(TABS.map((t) => t.id), setTab);
   const [toast, setToast] = useState<ToastMsg | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
   const say: Say = (text, tone = 'success') => setToast({ text, tone, id: Date.now() });

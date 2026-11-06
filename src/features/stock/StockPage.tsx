@@ -6,7 +6,6 @@ import { useCallback, useMemo, useState } from 'react';
 import { btnPrimary, btnSecondary, PageHeader } from '@/components/shell/PageHeader';
 import { Toast, type ToastMsg } from '@/components/ui/Toast';
 import { fmt } from '@/features/analytics/lib/metrics';
-import { MOCK_COMPANY } from '@/lib/mock/dashboard.mock';
 import { useSnapshot } from '@/lib/mock/useSnapshot';
 import { stockRows } from '@/lib/stock';
 import type { MaterialItem } from '@/types/firestore';
@@ -183,7 +182,7 @@ export default function StockPage() {
         </p>
       </section>
 
-      <ItemDrawer open={itemOpen} item={editing} snap={snap} userId={MOCK_COMPANY.uid} onClose={() => setItemOpen(false)} onDone={done} />
+      <ItemDrawer open={itemOpen} item={editing} snap={snap} userId="u_owner" onClose={() => setItemOpen(false)} onDone={done} />
       <ImportDrawer open={importOpen} snap={snap} onClose={() => setImportOpen(false)} onDone={done} />
       <Toast message={toast} onDone={clearToast} />
     </main>

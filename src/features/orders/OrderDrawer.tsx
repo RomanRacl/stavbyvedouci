@@ -6,11 +6,10 @@ import { Drawer } from '@/components/ui/Drawer';
 import { btnPrimary, btnSecondary, inputCls } from '@/components/shell/PageHeader';
 import { fmt } from '@/features/analytics/lib/metrics';
 import { MaterialSearch } from '@/features/materials/MaterialSearch';
-import { MOCK_COMPANY } from '@/lib/mock/dashboard.mock';
 import { deleteOrder, markOrderSent, receiveOrder, setSupplierEmail, updateOrder, type Snapshot } from '@/lib/mock/localBackend';
 import { orderTotal } from '@/lib/stock';
 import type { OrderLine, PurchaseOrder } from '@/types/firestore';
-import { ORDER_STATUS, orderMailto } from './orderText';
+import { ORDER_STATUS, orderMailto, senderOf } from './orderText';
 
 interface Props {
   order: PurchaseOrder | null;
@@ -91,7 +90,7 @@ export function OrderDrawer({ order: initial, snap, open, onClose, onDone }: Pro
               type="button"
               onClick={() => {
                 persist();
-                receiveOrder(MOCK_COMPANY.uid, order.id);
+                receiveOrder('u_owner', order.id);
                 onDone(`Zboží z ${order.number} je naskladněné v hlavním skladu.`);
               }}
               className={btnPrimary}
@@ -212,7 +211,7 @@ export function OrderDrawer({ order: initial, snap, open, onClose, onDone }: Pro
               className={`${inputCls} min-w-56 flex-1`}
             />
             <a
-              href={emailValid ? orderMailto({ ...order, lines, note }, email, snap.catalog, job?.code) : undefined}
+              href={emailValid ? orderMailto({ ...order, lines, note }, email, snap.catalog, job?.code, senderOf(snap.settings, snap.members.find((m) => m.role === 'owner')?.displayName)) : undefined}
               aria-disabled={!emailValid}
               onClick={() => {
                 if (!emailValid) return;

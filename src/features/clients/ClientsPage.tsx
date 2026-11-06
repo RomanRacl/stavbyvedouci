@@ -1,5 +1,7 @@
 'use client';
 
+
+import { useParamAction, useTabParam } from '@/lib/useTabParam';
 import { LayoutGroup, motion } from 'framer-motion';
 import { AlertTriangle, CalendarPlus, Mail, Pause, Pencil, Phone, Play, Plus, Repeat, Search, Trash2 } from 'lucide-react';
 import Link from 'next/link';
@@ -10,7 +12,7 @@ import { StatusPill } from '@/components/ui/StatusPill';
 import { Toast, type ToastMsg } from '@/components/ui/Toast';
 import { fmt } from '@/features/analytics/lib/metrics';
 import { priceLevelsOf } from '@/lib/finance';
-import { createFromRecurring, deleteRecurring, saveClient, saveRecurring, type Snapshot } from '@/lib/mock/localBackend';
+import { getSnapshot, createFromRecurring, deleteRecurring, saveClient, saveRecurring, type Snapshot } from '@/lib/mock/localBackend';
 import { useSnapshot } from '@/lib/mock/useSnapshot';
 import { clientsView, type ClientView } from '@/lib/operations';
 import { TRADE_LABEL, TRADES } from '@/lib/trades';
@@ -38,6 +40,7 @@ function DueBadge({ date }: { date: Date }) {
 export default function ClientsPage() {
   const snap = useSnapshot();
   const [tab, setTab] = useState<Tab>('clients');
+  useTabParam(TABS.map((t) => t.id), setTab);
   const [toast, setToast] = useState<ToastMsg | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
   const say = (text: string) => setToast({ text, tone: 'success', id: Date.now() });
@@ -71,6 +74,11 @@ function Directory({ snap, say }: { snap: Snapshot; say: (t: string) => void }) 
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<ClientView | null>(null);
   const all = useMemo(() => clientsView(snap), [snap]);
+  useParamAction('klient', (name) => {
+    setQ(name);
+    const c = clientsView(getSnapshot()).find((x) => x.name === name);
+    if (c) setOpen(c);
+  });
   const list = all.filter((c) => {
     const n = q.trim().toLocaleLowerCase('cs');
     return !n || [c.name, c.address, c.phone, c.email].some((v) => v.toLocaleLowerCase('cs').includes(n));

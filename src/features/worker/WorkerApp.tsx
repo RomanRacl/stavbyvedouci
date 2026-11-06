@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { CalendarClock, ChevronRight, Hand, MapPin, Play } from 'lucide-react';
+import { CalendarClock, ChevronRight, Hand, MapPin, Mic, Play, SunMedium } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { StatusPill } from '@/components/ui/StatusPill';
@@ -32,7 +32,9 @@ import {
 import { dayKey } from '@/lib/jobDefaults';
 import { stockAt, vanOf } from '@/lib/stock';
 import { needsSafety } from '@/lib/operations';
-import { useGloves } from '@/lib/theme';
+import { useGloves, useSun } from '@/lib/theme';
+import { useVoiceSupported, VoiceSheet } from './components/VoiceCommand';
+import type { VoiceCommand } from '@/lib/voiceCommands';
 import { LANGS, localeOf, t, useLang } from '@/lib/i18n';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { SafetySheet } from './components/SafetySheet';
@@ -107,6 +109,9 @@ export default function WorkerApp() {
   const [more, setMore] = useState<MoreKind | null>(null);
   const [safetyFor, setSafetyFor] = useState<{ job: Job; stageId: string | null } | null>(null);
   const [gloves, toggleGloves] = useGloves();
+  const [sun, toggleSun] = useSun();
+  const voiceOk = useVoiceSupported();
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [lang, changeLang] = useLang();
 
   /* Otevřená zakázka v URL (?job=…): tlačítko Zpět v telefonu ji zavře. */
@@ -176,6 +181,40 @@ export default function WorkerApp() {
     resumeWork(me.uid);
     say(t('Pokračujete, čas se zase měří.'));
   };
+  /* ---------- hlasové povely ---------- */
+  const onVoice = (c: VoiceCommand) => {
+    setVoiceOpen(false);
+    // Zakázka, ke které povel patří: otevřená, jinak ta, na které běží čas, jinak jediná rozpracovaná.
+    const target = openJob ?? timerJob ?? (active.length === 1 ? active[0] : null);
+    switch (c.kind) {
+      case 'start':
+        if (timer && (!openJob || openJob.id === timer.jobId)) return say(t('Čas už běží na {code}.', { code: timerJob?.code ?? '' }));
+        if (!target) return say(t('Otevřete zakázku a řekněte „začít“ znovu.'), 'error');
+        return start(target);
+      case 'stop':
+        return timer ? stop() : say(t('Teď se žádný čas neměří.'), 'error');
+      case 'pause':
+        return timer && !timer.pausedAt ? pause() : say(t('Teď se žádný čas neměří.'), 'error');
+      case 'resume':
+        return timer?.pausedAt ? resume() : say(t('Přestávka neběží.'), 'error');
+      case 'note':
+        if (!target) return say(t('Otevřete zakázku a řekněte poznámku znovu.'), 'error');
+        addNote(me.uid, target.id, c.text);
+        buzz();
+        return say(t('Poznámka uložena na {code}.', { code: target.code }));
+      case 'material':
+        if (!target) return say(t('Otevřete zakázku a řekněte „materiál“ znovu.'), 'error');
+        if (!openJob) open(target.id);
+        return setMaterialOpen(true);
+      case 'photo':
+        if (!target) return say(t('Otevřete zakázku a řekněte „fotka“ znovu.'), 'error');
+        if (!openJob) open(target.id);
+        // Fotoaparát smí otevřít jen klepnutí – posuneme k tlačítku a zvýrazníme ho.
+        setTimeout(() => window.dispatchEvent(new Event('stavbyvedouci:photo')), 350);
+        return say(t('Klepněte na Vyfotit.'));
+    }
+  };
+
   const today = dayKey();
   const dayConfirmedAt = snap.dayReports[`${me.uid}_${today}`] ?? null;
   const myLogs = snap.timeLogs.filter((l) => l.workerId === me.uid);
@@ -188,29 +227,52 @@ export default function WorkerApp() {
     <div key={lang} className="worker-root min-h-dvh bg-concrete">
       <main className="mx-auto max-w-md px-4 pt-6 pb-16">
         <header className="flex items-center gap-3">
-          <span className="grid size-11 place-items-center rounded-full bg-ink font-display font-semibold text-white">{me.initials}</span>
+          <span className="grid size-11 shrink-0 place-items-center rounded-full bg-ink font-display font-semibold text-white">{me.initials}</span>
           <div className="min-w-0 flex-1">
             <p className="text-sm text-ink-2">{new Date().toLocaleDateString(localeOf(lang), { weekday: 'long', day: 'numeric', month: 'long' })}</p>
             <h1 className="truncate font-display text-xl font-bold text-ink">{me.displayName}</h1>
           </div>
+          <ThemeToggle className="size-11 rounded-xl border border-line bg-surface" />
+        </header>
+        {/* Nástroje: na celou šířku, aby se jméno nemuselo zkracovat a tlačítka šla trefit i v rukavicích. */}
+        <div className={`mt-4 grid gap-2 ${voiceOk ? 'grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto]'}`}>
           <button
             type="button"
             onClick={() => setDayOpen(true)}
-            className="flex h-11 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-sm font-medium text-ink active:bg-concrete"
+            className="flex h-12 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-base font-medium text-ink active:bg-concrete"
           >
-            <CalendarClock className="size-4" /> {t('Můj den')}
+            <CalendarClock className="size-5" /> {t('Můj den')}
           </button>
+          {voiceOk && (
+            <button
+              type="button"
+              onClick={() => setVoiceOpen(true)}
+              aria-label={t('Hlasový povel')}
+              title={t('Hlasový povel')}
+              className="grid size-12 place-items-center rounded-xl border border-line bg-surface text-ink active:bg-concrete"
+            >
+              <Mic className="size-5" />
+            </button>
+          )}
           <button
             type="button"
             onClick={toggleGloves}
             aria-pressed={gloves}
             aria-label={gloves ? t('Vypnout režim pro rukavice') : t('Zapnout režim pro rukavice (větší tlačítka)')}
-            className={`grid size-11 place-items-center rounded-xl border ${gloves ? 'border-ink bg-ink text-white' : 'border-line bg-surface text-ink-2'}`}
+            className={`grid size-12 place-items-center rounded-xl border ${gloves ? 'border-ink bg-ink text-white' : 'border-line bg-surface text-ink-2'}`}
           >
             <Hand className="size-5" />
           </button>
-          <ThemeToggle className="size-11 rounded-xl border border-line bg-surface" />
-        </header>
+          <button
+            type="button"
+            onClick={toggleSun}
+            aria-pressed={sun}
+            aria-label={sun ? t('Vypnout režim na slunce') : t('Zapnout režim na slunce (vysoký kontrast)')}
+            className={`grid size-12 place-items-center rounded-xl border ${sun ? 'border-ink bg-ink text-white' : 'border-line bg-surface text-ink-2'}`}
+          >
+            <SunMedium className="size-5" />
+          </button>
+        </div>
 
         <OfflineBanner />
 
@@ -370,6 +432,8 @@ export default function WorkerApp() {
           />
         )}
       </AnimatePresence>
+
+      <VoiceSheet open={voiceOpen} onClose={() => setVoiceOpen(false)} onCommand={onVoice} />
 
       {openJob && (
         <MaterialSheet

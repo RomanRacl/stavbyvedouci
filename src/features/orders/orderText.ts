@@ -4,7 +4,20 @@ import type { MaterialItem, PurchaseOrder } from '@/types/firestore';
 const qty = (n: number) => n.toLocaleString('cs-CZ');
 
 /** Text objednávky pro e-mail dodavateli (bez cen – ty si dodavatel doplní sám). */
-export function orderEmailBody(order: PurchaseOrder, catalog: MaterialItem[], jobCode?: string) {
+export interface Sender {
+  name: string;
+  owner: string;
+  phone: string;
+}
+
+/** Odesílatel objednávek: údaje firmy z Nastavení a jméno majitele. */
+export const senderOf = (settings: { name: string; phone: string }, owner?: string): Sender => ({
+  name: settings.name || MOCK_COMPANY.name,
+  phone: settings.phone,
+  owner: owner ?? '',
+});
+
+export function orderEmailBody(order: PurchaseOrder, catalog: MaterialItem[], jobCode?: string, from: Sender = MOCK_COMPANY) {
   const lines = order.lines
     .map((l, i) => {
       const sku = catalog.find((c) => c.id === l.materialId)?.sku;
@@ -22,17 +35,17 @@ export function orderEmailBody(order: PurchaseOrder, catalog: MaterialItem[], jo
     'Prosíme o potvrzení objednávky a termínu dodání.',
     '',
     'S pozdravem',
-    MOCK_COMPANY.owner,
-    MOCK_COMPANY.name,
-    `tel. ${MOCK_COMPANY.phone}`,
+    from.owner,
+    from.name,
+    from.phone ? `tel. ${from.phone}` : '',
   ]
-    .filter((l, i, arr) => !(l === '' && arr[i - 1] === ''))
+    .filter((l, i, arr) => !(l === '' && (arr[i - 1] === '' || i === arr.length - 1)))
     .join('\n');
 }
 
-export function orderMailto(order: PurchaseOrder, email: string, catalog: MaterialItem[], jobCode?: string) {
-  const subject = `Objednávka ${order.number}, ${MOCK_COMPANY.name}`;
-  return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(orderEmailBody(order, catalog, jobCode))}`;
+export function orderMailto(order: PurchaseOrder, email: string, catalog: MaterialItem[], jobCode?: string, from: Sender = MOCK_COMPANY) {
+  const subject = `Objednávka ${order.number}, ${from.name}`;
+  return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(orderEmailBody(order, catalog, jobCode, from))}`;
 }
 
 export const ORDER_STATUS: Record<PurchaseOrder['status'], { label: string; cls: string }> = {

@@ -2,7 +2,6 @@
 
 import { Printer } from 'lucide-react';
 import { fmt } from '@/features/analytics/lib/metrics';
-import { MOCK_COMPANY } from '@/lib/mock/dashboard.mock';
 import { useSnapshot } from '@/lib/mock/useSnapshot';
 import { orderTotal } from '@/lib/stock';
 
@@ -19,6 +18,8 @@ export default function OrderPrint({ id }: { id: string }) {
   }
   const job = order.jobId ? snap.jobs.find((j) => j.id === order.jobId) : null;
   const skuOf = (mid: string) => snap.catalog.find((c) => c.id === mid)?.sku ?? '';
+  const co = snap.settings;
+  const owner = snap.members.find((m) => m.role === 'owner')?.displayName ?? '';
 
   return (
     <div className="theme-light min-h-dvh bg-concrete py-8 print:bg-white print:py-0">
@@ -35,9 +36,12 @@ export default function OrderPrint({ id }: { id: string }) {
       <article className="mx-auto max-w-[210mm] bg-white px-[16mm] py-[14mm] text-[13px] leading-relaxed text-ink shadow-xl print:max-w-none print:p-0 print:shadow-none">
         <header className="flex items-start justify-between gap-8 border-b-2 border-ink pb-5">
           <div>
-            <p className="font-display text-lg font-bold">{MOCK_COMPANY.name}</p>
-            <p>{MOCK_COMPANY.address}</p>
-            <p>tel. {MOCK_COMPANY.phone}</p>
+            {/* eslint-disable-next-line @next/next/no-img-element -- logo z nastavení */}
+            {co.logo && <img src={co.logo} alt="" className="mb-2 max-h-12 w-auto" />}
+            <p className="font-display text-lg font-bold">{co.name}</p>
+            <p>{co.address}</p>
+            {co.phone && <p>tel. {co.phone}</p>}
+            {co.ico && <p>IČO {co.ico}</p>}
           </div>
           <div className="text-right">
             <h1 className="font-display text-2xl font-bold">Objednávka</h1>
@@ -107,7 +111,7 @@ export default function OrderPrint({ id }: { id: string }) {
 
         <footer className="mt-16 flex justify-end">
           <div className="w-64 border-t border-ink pt-1 text-center text-xs">
-            {MOCK_COMPANY.owner}, {MOCK_COMPANY.name}
+            {owner ? `${owner}, ` : ''}{co.name}
           </div>
         </footer>
       </article>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useTabParam } from '@/lib/useTabParam';
 import { LayoutGroup, motion } from 'framer-motion';
 import { AlertTriangle, Download, FileOutput, Plus, Printer, Trash2, Undo2 } from 'lucide-react';
 import Link from 'next/link';
@@ -51,6 +52,7 @@ const lastMonths = (n: number) =>
 export default function MoneyPage() {
   const snap = useSnapshot();
   const [tab, setTab] = useState<Tab>('invoice');
+  useTabParam(TABS.map((t) => t.id), setTab);
   const [toast, setToast] = useState<ToastMsg | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
   const say = (text: string, tone: ToastMsg['tone'] = 'success') => setToast({ text, tone, id: Date.now() });

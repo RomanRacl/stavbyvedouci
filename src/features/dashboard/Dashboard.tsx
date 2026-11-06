@@ -3,6 +3,8 @@
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import { AlertCircle, CheckCircle2, ClipboardList, Plus, WifiOff } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import { useSnapshot } from '@/lib/mock/useSnapshot';
+import { StartBanner } from '@/features/onboarding/StartBanner';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { companyKpis } from '@/features/analytics/lib/metrics';
 import { USE_MOCK, useDashboardData } from '@/features/jobs/hooks/useDashboardData';
@@ -144,6 +146,16 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
      Next 15 propisuje window.history.pushState do useSearchParams, takže Zpět v prohlížeči zavře detail. */
   const searchParams = useSearchParams();
   const selectedId = searchParams.get('job');
+  const liveSnap = useSnapshot();
+  const snapFresh = liveSnap?.fresh ?? false;
+  const shownName = liveSnap?.settings.name || companyName;
+  // Rychlé hledání (Ctrl+K) otevírá novou zakázku přes ?nova=1.
+  const wantsNew = searchParams.get('nova') === '1';
+  useEffect(() => {
+    if (!wantsNew) return;
+    setNewJobOpen(true);
+    window.history.replaceState(null, '', window.location.pathname);
+  }, [wantsNew]);
   const select = useCallback((id: string | null) => {
     const url = new URL(window.location.href);
     if (id) url.searchParams.set('job', id);
@@ -220,7 +232,7 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
         {/* Hlavička + filtr období v jedné řadě nad grafy */}
         <header className="mb-6 flex flex-wrap items-end gap-x-6 gap-y-3">
           <div className="min-w-0 basis-full sm:basis-auto sm:flex-1">
-            <p className="text-sm text-ink-2">{companyName}</p>
+            <p className="text-sm text-ink-2">{shownName}</p>
             <h1 className="font-display text-3xl font-bold tracking-tight text-ink sm:text-4xl">Přehled zakázek</h1>
           </div>
           <LiveBadge status={data.status} at={data.lastEventAt} />
@@ -264,6 +276,14 @@ export default function Dashboard({ companyId, companyName, currentUid }: Dashbo
           <Skeleton />
         ) : (
           <div className="space-y-5">
+            <StartBanner
+              fresh={snapFresh}
+              welcome={searchParams.get('vitejte') === '1'}
+              onNewJob={() => {
+                setEditing(null);
+                setNewJobOpen(true);
+              }}
+            />
             {alertJobs.length > 0 && (
               <Link
                 href="/analytika"

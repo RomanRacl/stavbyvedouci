@@ -69,7 +69,7 @@ export function useDashboardData(companyId: string): DashboardDataApi {
           ...s,
           jobs: snap.jobs,
           members: snap.members,
-          weeklyStats: mockWeeklyStats,
+          weeklyStats: snap.fresh ? [] : mockWeeklyStats,
           catalog: snap.catalog,
           vans: snap.vans,
           stockMoves: snap.stockMoves,

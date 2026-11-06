@@ -2,6 +2,7 @@
 
 import { FileSpreadsheet, ImagePlus, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { ImportDataDrawer } from './ImportDataDrawer';
+import { BackdropSection, BackupSection, FreshStartCard } from './DataSections';
 import type { ImportKind } from '@/lib/import/dataImport';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { btnPrimary, btnSecondary, inputCls, PageHeader } from '@/components/shell/PageHeader';
@@ -65,13 +66,16 @@ export default function SettingsPage() {
   if (!snap || !f) return <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6" aria-busy="true" />;
 
   const set = <K extends keyof CompanySettings>(k: K, v: CompanySettings[K]) => setF({ ...f, [k]: v });
-  const dirty = JSON.stringify(f) !== JSON.stringify(snap.settings);
+  // Fotky na pozadí se ukládají hned po nahrání, do rozpracovaného formuláře nepatří.
+  const strip = (x: CompanySettings) => ({ ...x, backdrops: undefined });
+  const dirty = JSON.stringify(strip(f)) !== JSON.stringify(strip(snap.settings));
+  const say = (text: string, tone: 'success' | 'error' = 'success') => setToast({ text, tone, id: Date.now() });
   const icoValid = !f.ico || /^\d{8}$/.test(f.ico);
 
   const save = (e: FormEvent) => {
     e.preventDefault();
     if (!icoValid) return setToast({ text: 'IČO má 8 číslic.', tone: 'error', id: Date.now() });
-    saveSettings({ ...f, defaultVatMode: f.vatPayer ? (f.defaultVatMode === 'none' ? 'standard21' : f.defaultVatMode) : 'none' });
+    saveSettings({ ...f, backdrops: snap.settings.backdrops, defaultVatMode: f.vatPayer ? (f.defaultVatMode === 'none' ? 'standard21' : f.defaultVatMode) : 'none' });
     setToast({ text: 'Nastavení uloženo.', tone: 'success', id: Date.now() });
   };
 
@@ -310,6 +314,15 @@ export default function SettingsPage() {
       </section>
       <ImportDataDrawer kind={importing} snap={snap} onClose={() => setImporting(null)} onDone={(t) => { setImporting(null); setToast({ text: t, tone: 'success', id: Date.now() }); }} />
 
+      <BackupSection
+        say={(t, tone) => {
+          say(t, tone);
+          setF(null);
+        }}
+      />
+      <BackdropSection snap={snap} say={say} />
+      <FreshStartCard fresh={snap.fresh} />
+
       <section className="mt-8 rounded-xl border border-line bg-surface p-5">
         <h2 className="text-base font-semibold text-ink">Zátěžový test</h2>
         <p className="mt-1 text-sm text-ink-2">Přidá tisíce smyšlených dokončených zakázek, abyste viděli, jak aplikace zvládá velkou firmu. Data se neukládají, jen se dopočítají.</p>
@@ -328,8 +341,8 @@ export default function SettingsPage() {
       </section>
 
       <section className="mt-8 rounded-xl border border-crit/30 bg-surface p-5">
-        <h2 className="text-base font-semibold text-ink">Ukázková data</h2>
-        <p className="mt-1 text-sm text-ink-2">Smaže všechno, co jste v tomto prohlížeči vytvořili nebo změnili, a vrátí ukázkovou firmu do původního stavu. Fotky zůstanou uložené, ale nebudou u žádné zakázky.</p>
+        <h2 className="text-base font-semibold text-ink">Ukázková firma</h2>
+        <p className="mt-1 text-sm text-ink-2">Smaže všechno, co jste v tomto prohlížeči vytvořili nebo změnili, a vrátí ukázkovou firmu do původního stavu. Než to uděláte, stáhněte si zálohu.</p>
         {confirmReset ? (
           <div className="mt-3 flex gap-2">
             <button
