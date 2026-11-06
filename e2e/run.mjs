@@ -155,6 +155,39 @@ test('analytika: cíle a co kdyby', async (page) => {
   await seeText(page, 'Co kdyby');
 });
 
+test('rychlé hledání: Ctrl+K najde zakázku podle adresy bez diakritiky', async (page) => {
+  await go(page, '/dashboard');
+  await page.keyboard.press('Control+k');
+  await page.getByRole('combobox', { name: 'Hledat' }).fill('zdar lesni');
+  await page.keyboard.press('Enter');
+  await eventually(async () => page.url().includes('job=job_0142'), 'hledání neotevřelo zakázku');
+});
+
+test('upozornění: zvoneček vede na pohledávky', async (page) => {
+  await go(page, '/dashboard');
+  await page.getByRole('button', { name: /^Upozornění/ }).first().click();
+  await page.getByRole('dialog').getByRole('link', { name: /po splatnosti/ }).first().click();
+  await eventually(async () => (await page.getByRole('tab', { name: 'Pohledávky a upomínky' }).getAttribute('aria-selected')) === 'true', 'nepřepnulo na záložku pohledávek');
+});
+
+test('začít naostro: průvodce smaže ukázku a nový člověk je v mobilu', async (page) => {
+  await go(page, '/zacit');
+  await page.getByLabel('Název firmy *').fill('Elektro Test s.r.o.');
+  await page.getByRole('button', { name: 'Pokračovat' }).click();
+  await page.getByRole('button', { name: 'Pokračovat' }).click();
+  await page.getByLabel('Vaše jméno *').fill('Majitel Testovací');
+  await page.getByLabel('Jméno', { exact: true }).first().fill('Karel Nový');
+  await page.getByRole('button', { name: 'Pokračovat' }).click();
+  await page.getByLabel('Potvrzení: napište NAOSTRO').fill('NAOSTRO');
+  await page.getByRole('button', { name: 'Začít naostro' }).click();
+  await seeText(page, 'Hotovo, firma jede naostro');
+  await seeText(page, 'Elektro Test s.r.o.');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await go(page, '/w');
+  await seeText(page, 'Karel Nový');
+  expect((await page.getByText('Jan Dvořák').count()) === 0, 'ukázkový dělník zůstal v mobilu');
+});
+
 /* ---------- mobil party ---------- */
 
 test('mobil: start a konec práce', async (page) => {
