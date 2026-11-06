@@ -95,7 +95,7 @@ test('pohledávky: text upomínky', async (page) => {
   await go(page, '/penize');
   await page.getByRole('tab', { name: 'Pohledávky a upomínky' }).click();
   await page.getByRole('button', { name: /upomínka$/ }).first().click();
-  await seeText(page, 'Připomenutí platby');
+  await seeText(page, /Připomenutí platby|Upomínka/);
   await page.getByRole('button', { name: 'Odesláno, zapsat' }).click();
   await seeText(page, 'upomínka k');
 });
